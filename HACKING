@@ -1,0 +1,9 @@
+
+Coding convention notes
+=======================
+
+We follow simliar conventions to Xapian, with the exceptions:
+
+ * Header file includes should be done strictly in alphabetical order, with
+   the exception that all source files should start with '#include <config.h>',
+   followed by 'include "file.h"' for a source file file.cc, if file.h exists.
