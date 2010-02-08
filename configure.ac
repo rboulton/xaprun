@@ -246,5 +246,5 @@ dnl **************************
 dnl * Build the output files *
 dnl **************************
 
-AC_CONFIG_FILES([Makefile docs/Makefile])
+AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
