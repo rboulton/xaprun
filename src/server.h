@@ -23,8 +23,13 @@
  * IN THE SOFTWARE.
  */
 
+#ifndef XAPSRV_INCLUDED_SERVER_H
+#define XAPSRV_INCLUDED_SERVER_H
+
 class Server {
   public:
     Server();
     void run();
 };
+
+#endif /* XAPSRV_INCLUDED_SERVER_H */
