@@ -161,9 +161,9 @@ dnl Pass `--quiet' to libtool if quiet building is requested.  Using an
 dnl AC_SUBST-ed value like this allows the choice to be easily overridden
 dnl if you want to see exactly what make and libtool are up to - just run
 dnl make like this: `make QUIET='
-QUIET=
-if test yes = "$enable_quiet"; then
-  QUIET=--quiet
+QUIET=--quiet
+if test no = "$enable_quiet"; then
+  QUIET=
 fi
 AC_SUBST(QUIET)
 
