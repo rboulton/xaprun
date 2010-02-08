@@ -2,3 +2,11 @@ Author
 ======
 
 Richard Boulton <richard@tartarus.org>
+
+
+External code
+=============
+
+Parts of the code are copied from other projects:
+
+ - Olly Betts: ext/str.{cc,h}
