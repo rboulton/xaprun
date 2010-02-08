@@ -32,14 +32,12 @@ template<class T>
 inline string
 tostring_unsigned(T value)
 {
-    STATIC_ASSERT_UNSIGNED_TYPE(T);
     // We need a special case for 0, and we might as well handle all single
     // digit numbers with it too.
     if (value < 10) return string(1, '0' + char(value));
     char buf[(sizeof(T) * 5 + 1) / 2];
     char * p = buf + sizeof(buf);
     do {
-	AssertRel(p,>,buf);
 	char ch(value % 10);
 	value /= 10;
 	*(--p) = ch + '0';
@@ -61,14 +59,12 @@ tostring(T value)
     char buf[(sizeof(T) * 5 + 1) / 2 + 1];
     char * p = buf + sizeof(buf);
     do {
-	AssertRel(p,>,buf);
 	char ch(value % 10);
 	value /= 10;
 	*(--p) = ch + '0';
     } while (value);
 
     if (negative) {
-	AssertRel(p,>,buf);
 	*--p = '-';
     }
     return string(p, buf + sizeof(buf) - p);
@@ -119,7 +115,6 @@ format(const char * fmt, T value)
     // If -1 is returned (as pre-ISO snprintf does if the buffer is too small,
     // it will be cast to > sizeof(buf) and handled appropriately.
     size_t size = SNPRINTF_ISO(buf, sizeof(buf), fmt, value);
-    AssertRel(size,<=,sizeof(buf));
     if (size > sizeof(buf)) size = sizeof(buf);
 #else
     size_t size = sprintf(buf, fmt, value);
