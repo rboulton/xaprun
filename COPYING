@@ -1,3 +1,8 @@
+License
+=======
+
+The code for Xappy server is under the following license:
+
 Copyright (c) 2010 Richard Boulton
 
 Permission is hereby granted, free of charge, to any person
@@ -20,3 +25,17 @@ HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
 WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
+
+Notes
+=====
+
+Xappy-server links to the Xapian library, which is currently under the GPL
+license.  Distributions of Xappy-server together with the Xapian library must
+respect the Xapian license, and need therefore to comply with the terms of the
+GPL.
+
+Exceptions
+==========
+
+configure.ac contains sections copied from the configure.ac file for xapian's
+"omega" application.
