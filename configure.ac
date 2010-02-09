@@ -31,6 +31,7 @@ dnl mingw (for instance) lacks ssize_t
 AC_CHECK_TYPE(ssize_t, int)
 AC_TYPE_MODE_T
 AC_TYPE_PID_T
+AC_FUNC_STRERROR_R
 
 dnl Check that snprintf actually works as it's meant to.
 dnl
