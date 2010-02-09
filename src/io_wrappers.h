@@ -47,6 +47,19 @@ int io_open_append_create(const char * filename);
  */
 bool io_write(int fd, const char * data, ssize_t len);
 
+/** Write to a file descriptor.
+ *
+ *  @param fd The file descriptor to write to.
+ *  @param data The data to write.
+ *
+ *  @returns true if written successfully, false otherwise.  Errno will be set
+ *  if false is returned.
+ */
+inline bool io_write(int fd, const std::string & data)
+{
+    return io_write(fd, data.data(), data.size());
+}
+
 /** Close a file descriptor.
  *
  *  @returns true if closed successfully, false otherwise.  Errno will be set
