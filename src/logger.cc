@@ -27,6 +27,8 @@
 #include "logger.h"
 
 #include <cstdlib>
+#include <cstdio>
+#include <cstring>
 #include <errno.h>
 #include "io_wrappers.h"
 #include "str.h"
