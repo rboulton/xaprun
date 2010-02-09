@@ -26,8 +26,86 @@
 #include <config.h>
 #include "server.h"
 
-int main(int argc, char ** argv) {
-    server = Server();
-    server.run();
-    return 0;
+#include <errno.h>
+#include "io_wrappers.h"
+#include "settings.h"
+#include <sys/socket.h>
+#include <sys/types.h>
+#include "utils.h"
+
+Server::Server(const ServerSettings & settings_)
+	: settings(settings_),
+	  logger(settings_.log_filename),
+	  started(false),
+	  shutting_down(false),
+	  shutdown_pipe(-1)
+{
+}
+
+Server::~Server()
+{
+    shutdown();
+}
+
+bool
+Server::run()
+{
+    if (started || shutting_down) {
+	// Exit immediately, without an error.
+	return true;
+    }
+    started = true;
+
+    // Create the socket used for signalling a shutdown request.
+    int shutdown_pipe_listen_end;
+    {
+	int fds[2];
+	int ret = socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, fds);
+	if (ret == -1) {
+	    set_sys_error("Couldn't create internal socketpair", errno);
+	    return false;
+	}
+	shutdown_pipe = fds[0];
+	shutdown_pipe_listen_end = fds[1];
+    }
+    set_up_signal_handlers();
+
+    // Start the worker threads.
+
+
+    // Listen for a byte on the shutdown pipe.
+    std::string result;
+    if (!io_read_exact(result, shutdown_pipe_listen_end, 1)) {
+	set_sys_error("Couldn't read from internal socket", errno);
+	return false;
+    }
+    
+    // Shut down the worker threads.
+
+
+    return true;
+}
+
+bool
+Server::shutdown()
+{
+    if (shutting_down) return false;
+    // Note - this method must be safe to call inside a signal handler.
+    // Therefore, all it does is set the "closing down" flag, and send a byte
+    // on the "closing down" pipe.
+    shutting_down = true;
+    if (started) {
+	io_write(shutdown_pipe, "S");
+    }
+    return true;
+}
+
+void
+Server::set_sys_error(const std::string & message, int errno_value)
+{
+    if (!error_message.empty()) {
+	// Don't overwrite an error condition set earlier
+	return;
+    }
+    error_message = message + ": " + get_sys_error(errno_value);
 }

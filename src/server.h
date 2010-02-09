@@ -26,10 +26,75 @@
 #ifndef XAPSRV_INCLUDED_SERVER_H
 #define XAPSRV_INCLUDED_SERVER_H
 
+#include "logger.h"
+#include "settings.h"
+
 class Server {
+    /// The settings used by this server.
+    const ServerSettings & settings;
+
+    /// Logger to use.
+    Logger logger;
+
+    /// Flag, set to true when the server has started.
+    bool started;
+
+    /// Flag, set to true when a shutdown request has been made.
+    bool shutting_down;
+
+    /** A pipe, written to when a request to shutdown is made to wake up the
+     *  main thread.
+     */
+    int shutdown_pipe;
+
+    /** The error message, when the server has failed to start or terminated
+     *  on error.
+     */
+    std::string error_message;
+
+    /** Set the error message to describe a system error.
+     */
+    void set_sys_error(const std::string & message, int errno_value);
+
+    /** Set up the signal handlers.
+     */
+    bool set_up_signal_handlers();
+
   public:
-    Server();
-    void run();
+    Server(const ServerSettings & settings_);
+    ~Server();
+
+    /** Run the server.
+     *
+     *  This should usually only be called once - if called repeatedly,
+     *  subsequent calls will return immediately.
+     *
+     *  @retval true if the server ran without error and terminated cleanly.
+     *  @retval false if the server failed to start, or terminated on error.  In this situation, a message describing the error can be obtained with
+     */
+    bool run();
+
+    /** Start the shutdown of the server.
+     *
+     *  This returns immediately, but the server may take some time to shut
+     *  down fully.
+     *
+     *  It is safe to call this from a signal handler, and from any thread.  It
+     *  is safe to call it repeatedly - only the first call will have any
+     *  effect.  If the server hasn't started yet, it will exit immediately
+     *  when started.
+     *
+     *  @retval false if already shutting down
+     *  @retval true if not already shutting down
+     */
+    bool shutdown();
+
+    /** Get the error message.
+     *
+     *  This will contain a message when the server has failed to start or
+     *  terminated on error.  Otherwise, it will be empty.
+     */
+    const std::string & get_error_message() const { return error_message; }
 };
 
 #endif /* XAPSRV_INCLUDED_SERVER_H */
