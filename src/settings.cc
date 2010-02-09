@@ -27,7 +27,7 @@
 #include "settings.h"
 
 #include <cstdlib>
-#include "gnu_getopt.h"
+#include <getopt.h>
 #include <iostream>
 #include <xapian.h>
 
@@ -58,7 +58,7 @@ ServerSettings::parse_args(int argc, char ** argv)
     };
 
     int getopt_ret;
-    while ((getopt_ret = gnu_getopt_long(argc, argv, "hvi:p:s:u:l:", longopts, NULL)) != -1)
+    while ((getopt_ret = getopt_long(argc, argv, "hvi:p:s:u:l:", longopts, NULL)) != -1)
     {
 	switch (getopt_ret) {
 	    case '?': {
