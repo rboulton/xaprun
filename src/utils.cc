@@ -25,11 +25,30 @@
 #include <config.h>
 #include "utils.h"
 
-#include <stdio.h>
+#include "str.h"
+#include <string>
+#include <string.h>
 
-void
-fatal(const char * message)
+std::string
+get_sys_error(int errno_value)
 {
-    fprintf(stderr, "%s\n", message);
-    exit(EXIT_FAILURE);
+#ifdef HAVE_STRERROR_R
+#define ERRBUFSIZE 256
+    char buf[ERRBUFSIZE];
+    buf[0] = '\0';
+#ifdef STRERROR_R_CHAR_P
+    return std::string(strerror_r(errno_value, buf, ERRBUFSIZE));
+#else
+    int ret = strerror_r(errno_value, buf, ERRBUFSIZE);
+    if (ret == 0) {
+	buf[ERRBUFSIZE - 1] = '\0';
+	return std::string(buf);
+    } else {
+	return std::string("code " + str(errno_value));
+    }
+#endif
+#undef ERRBUFSIZE
+#else
+    return std::string(strerror(errno_value));
+#endif
 }

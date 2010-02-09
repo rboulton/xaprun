@@ -22,4 +22,11 @@
  * IN THE SOFTWARE.
  */
 
-extern void fatal(const char * message);
+#ifndef XAPSRV_INCLUDED_UTILS_H
+#define XAPSRV_INCLUDED_UTILS_H
+
+#include <string>
+
+std::string get_sys_error(int errno_value);
+
+#endif /* XAPSRV_INCLUDED_UTILS_H */
