@@ -24,91 +24,110 @@
  */
 
 #include <config.h>
-
 #include "server.h"
+
+#include <errno.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <unistd.h>
 
+/// Global variable pointing to the server - used for cleanup.
 Server * g_server;
 
-/** Handler for SIGTERM.
+/// Global variable holding the server PID - used to only cleanup in right pid.
+pid_t g_server_pid;
+
+// Forward declarations.
+extern "C" void handle_sig(int signum);
+
+/** Shut down the server.
  *
- *  Clean up the server, and ensure that all processes in the process group
- *  are terminated with SIGTERM.
+ *  Returns false if a shutdown attempt was already in progress, or couldn't be done.
  */
-extern "C" static void
-handle_sigterm(int) {
-    struct sigaction act;
-    g_server.cleanup();
-    act.sa_handler = SIG_DFL;
-    act.sa_flags = 0;
-    sigemptyset(&sa.sa_mask);
-    (void) sigaction(SIGTERM, &act, NULL);
-    kill(0, SIGTERM);
-    exit(EXIT_SUCCESS);
+static bool
+cleanup_server()
+{
+    if (g_server != NULL) {
+	if (g_server_pid != getpid()) {
+	    return false;
+	}
+	return g_server->shutdown();
+    }
+    return false;
 }
 
-/** Handler for SIGINT.
+/** Send a signal to all processes in the process group.
  *
- *  Clean up the server, and ensure that all processes in the process group
- *  are terminated with SIGINT.
+ *  @param signum The signal to send.
  */
-extern "C" static void
-handle_sigint(int) {
+static void
+signal_process_group(int signum)
+{
     struct sigaction act;
-    g_server.cleanup();
     act.sa_handler = SIG_DFL;
     act.sa_flags = 0;
-    sigemptyset(&sa.sa_mask);
-    (void) sigaction(SIGINT, &act, NULL);
-    kill(0, SIGINT);
-    exit(EXIT_SUCCESS);
+    sigemptyset(&act.sa_mask);
+    (void) sigaction(signum, &act, NULL);
+    kill(0, signum);
 }
 
-/** Handler for SIGCHLD.
- *
- *  Ensure that all children which have exited are waited for.
- */
-extern "C" static viod
-handle_sigchld(int) {
-    while (true) {
-	int ret = waidpid(-1, NULL, WNOHANG);
-	if (ret <= 0) break;
+// Generic signal handler.
+extern "C" void
+handle_sig(int signum)
+{
+    switch (signum) {
+	case SIGINT:
+	    {
+		if (!cleanup_server()) {
+		    signal_process_group(signum);
+		    exit(EXIT_SUCCESS);
+		}
+		break;
+	    }
+	case SIGTERM:
+	    {
+		(void) cleanup_server();
+		signal_process_group(signum);
+		exit(EXIT_SUCCESS);
+		break;
+	    }
+	case SIGCHLD:
+	    {
+		// Ensure that all children which have exited are waited for.
+		while (true) {
+		    int ret = waitpid(-1, NULL, WNOHANG);
+		    if (ret <= 0) break;
+		}
+		break;
+	    }
     }
 }
 
-void
-fatal(const char * message) {
-    fprintf(stderr, "%s\n", message);
-    exit(EXIT_FAILURE);
-}
-
-void
-set_up_signal_handlers(Server & server) {
+bool
+Server::set_up_signal_handlers()
+{
     struct sigaction act;
-
-    g_server = &server;
-
-    act.sa_handler = handle_sigterm;
+    g_server = this;
+    g_server_pid = getpid();
+    act.sa_handler = handle_sig;
     act.sa_flags = 0;
-    sigemptyset(&sa.sa_mask);
+    sigemptyset(&act.sa_mask);
+    sigaddset(&act.sa_mask, SIGTERM);
+    sigaddset(&act.sa_mask, SIGINT);
+    sigaddset(&act.sa_mask, SIGCHLD);
     if (sigaction(SIGTERM, &act, NULL) == -1) {
-	fatal("Unable to set SIGTERM handler");
+	set_sys_error("Unable to set SIGTERM handler", errno);
+	return false;
     }
-
-    act.sa_handler = handle_sigint;
-    act.sa_flags = 0;
-    sigemptyset(&sa.sa_mask);
     if (sigaction(SIGINT, &act, NULL) == -1) {
-	fatal("Unable to set SIGINT handler");
+	set_sys_error("Unable to set SIGINT handler", errno);
+	return false;
     }
-
-    act.sa_handler = handle_sigchld;
-    act.sa_flags = 0;
-    sigemptyset(&sa.sa_mask);
     if (sigaction(SIGCHLD, &act, NULL) == -1) {
-	fatal("Unable to set SIGCHLD handler");
+	set_sys_error("Unable to set SIGCHLD handler", errno);
+	return false;
     }
+    return true;
 }
