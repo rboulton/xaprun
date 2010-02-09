@@ -28,6 +28,8 @@ AM_LDFLAGS =
 
 xappy_server_SOURCES = \
 	ext/str.cc \
+	src/cli.cc \
+	src/io_wrappers.cc \
 	src/logger.cc \
 	src/server.cc \
 	src/settings.cc \
