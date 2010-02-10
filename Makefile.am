@@ -21,7 +21,9 @@ noinst_HEADERS = \
 	src/io_wrappers.h \
 	src/logger.h \
 	src/server.h \
+	src/serverinternal.h \
 	src/settings.h \
+	src/signals.h \
 	src/utils.h
 
 AM_LDFLAGS =
