@@ -121,4 +121,17 @@ bool io_read_exact(std::string & result, int fd, size_t to_read);
  */
 bool io_read_append(std::string & result, int fd, size_t max_to_read);
 
+/** Read some bytes, and append to a string.
+ *
+ *  @param result A string to which the bytes which have been read will be
+ *  appended.
+ *  @param fd The file descriptor to read from.
+ *  @param max_to_read The maxium number of bytes to read.
+ *
+ *  @returns true if read without error (though possibly having been unable
+ *  to read all bytes requested due to EOF), false otherwise.  Errno will be
+ *  set if false is returned.
+ */
+bool io_read_append(std::string & result, int fd);
+
 #endif /* XAPSRV_INCLUDED_IO_WRAPPERS_H */

@@ -129,3 +129,9 @@ io_read_append(std::string & result, int fd, size_t max_to_read)
 	}
     }
 }
+
+bool
+io_read_append(std::string & result, int fd)
+{
+    return io_read_append(result, fd, CHUNKSIZE);
+}
