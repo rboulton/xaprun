@@ -29,8 +29,9 @@
 #include "worker.h"
 
 bool
-Server::Internal::dispatch_request(std::string & buf)
+Server::Internal::dispatch_request(int connection_num, std::string & buf)
 {
+    (void) connection_num;
     (void) buf;
     return false;
 }

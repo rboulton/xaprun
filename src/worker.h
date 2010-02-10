@@ -35,7 +35,11 @@
 /** Exception raised to stop a worker.
  */
 class StopWorkerException {
-  int dummy;
+    std::string message;
+  public:
+    StopWorkerException() : message() {}
+    StopWorkerException(const std::string & message_) : message(message_) {}
+    const std::string & get_message() const { return message; }
 };
 
 class Worker {

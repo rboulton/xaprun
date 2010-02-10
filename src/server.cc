@@ -72,10 +72,12 @@ Server::Internal::Internal(const ServerSettings & settings_)
 	  nudge_read_end(-1),
 	  error_message()
 {
+    pthread_mutex_init(&outgoing_message_mutex, NULL);
 }
 
 Server::Internal::~Internal()
 {
+    pthread_mutex_destroy(&outgoing_message_mutex);
 }
 
 bool
@@ -86,6 +88,7 @@ Server::Internal::run()
 	return true;
     }
     started = true;
+    logger.info("Starting server");
 
     // Create the socket used for signalling a shutdown request.
     {
@@ -118,6 +121,7 @@ Server::Internal::run()
 	(void)io_close(nudge_read_end);
 	throw;
     }
+    logger.info("Shut down");
     return error_message.empty();
 }
 
@@ -161,13 +165,19 @@ Server::Internal::mainloop()
 	// Check the nudge pipe
 	if (FD_ISSET(nudge_read_end, &rfds)) {
 	    std::string result;
-	    if (!io_read_exact(result, nudge_read_end, 1)) {
+	    if (!io_read_append(result, nudge_read_end)) {
 		set_sys_error("Couldn't read from internal socket", errno);
-	    }
-	    if (result.empty() || result == "S") {
-		// Shutdown
 		return;
 	    }
+	    if (result.find('S') != result.npos) {
+		// Shutdown
+		logger.info("Shutting down");
+		return;
+	    }
+	    // Currently, the only other thing we can get is 'R', indicating
+	    // that there are responses to deliver.
+	    if (!dispatch_responses())
+		return;
 	}
 
 	// Check each connection's file descriptors.
@@ -179,7 +189,7 @@ Server::Internal::mainloop()
 				  str(i->second.read_fd));
 		}
 		// Dispatch all the requests in the buffer.
-		while (dispatch_request(i->second.read_buf)) {}
+		while (dispatch_request(i->first, i->second.read_buf)) {}
 	    }
 	    if (FD_ISSET(i->second.write_fd, &wfds)) {
 		if (!io_write_some(i->second.write_fd, i->second.write_buf)) {
@@ -205,19 +215,24 @@ Server::Internal::emergency_shutdown()
 void
 Server::Internal::set_sys_error(const std::string & message, int errno_value)
 {
+    std::string new_message = message + ": " + get_sys_error(errno_value);
+    logger.fatal(new_message);
     if (!error_message.empty()) {
 	// Don't overwrite an error condition set earlier
 	return;
     }
-    error_message = message + ": " + get_sys_error(errno_value);
+    error_message = new_message;
 }
 
 bool
 Server::Internal::start_listening()
 {
     if (settings.use_stdio) {
+	logger.info("Listening on stdio");
 	connections[0] = Connection(0, 1);
     }
+
+    // FIXME - listen on tcp interface specified in settings
 
     return true;
 }
@@ -225,5 +240,54 @@ Server::Internal::start_listening()
 void
 Server::Internal::stop_listening()
 {
+    // FIXME - stop listening on tcp interface
+}
 
+bool
+Server::Internal::dispatch_responses()
+{
+    if (pthread_mutex_lock(&outgoing_message_mutex) != 0) {
+	set_sys_error("Couldn't lock outgoing message mutex", errno);
+	return false;
+    }
+    try {
+	while (!outgoing_messages.empty()) {
+	    int conn_num = outgoing_messages.front().first;
+	    std::map<int, Connection>::iterator i = connections.find(conn_num);
+	    if (i != connections.end()) {
+		i->second.write_buf.append(outgoing_messages.front().second);
+	    } else {
+		// log the inability to send the messsage
+		logger.info("Couldn't add response to connection number " +
+			    str(conn_num) + " - connection not found");
+	    }
+	    outgoing_messages.pop();
+	}
+    } catch(...) {
+	pthread_mutex_unlock(&outgoing_message_mutex);
+	throw;
+    }
+    if (pthread_mutex_unlock(&outgoing_message_mutex) != 0) {
+	set_sys_error("Couldn't unlock outgoing message mutex", errno);
+	return false;
+    }
+    return true;
+}
+
+void
+Server::Internal::queue_response(int connection_num,
+				 const std::string & response)
+{
+    if (pthread_mutex_lock(&outgoing_message_mutex) != 0) {
+	throw StopWorkerException("Couldn't lock outgoing message mutex");
+    }
+    try {
+	outgoing_messages.push(make_pair(connection_num, response));
+    } catch(...) {
+	pthread_mutex_unlock(&outgoing_message_mutex);
+	throw;
+    }
+    if (pthread_mutex_unlock(&outgoing_message_mutex) != 0) {
+	throw StopWorkerException("Couldn't unlock outgoing message mutex");
+    }
 }

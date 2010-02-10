@@ -27,6 +27,7 @@
 #define XAPSRV_INCLUDED_SERVERINTERNAL_H
 
 #include "logger.h"
+#include <queue>
 #include "server.h"
 #include "settings.h"
 #include <map>
@@ -83,6 +84,14 @@ class Server::Internal {
      */
     WorkerPool workers;
 
+    /** Mutex to be held whenever accessing outgoing_messages.
+     */
+    pthread_mutex_t outgoing_message_mutex;
+
+    /** Messages ready to be passed to a connection.
+     */
+    std::queue<std::pair<int, std::string> > outgoing_messages;
+
     /** Run the main loop.
      */
     void mainloop();
@@ -103,7 +112,11 @@ class Server::Internal {
      *
      *  @retval true if a request was found in "buf", false otherwise.
      */
-    bool dispatch_request(std::string & buf);
+    bool dispatch_request(int connection_num, std::string & buf);
+
+    /** Dispatch all responses which are ready.
+     */
+    bool dispatch_responses();
 
   public:
     Internal(const ServerSettings & settings_);
@@ -144,6 +157,8 @@ class Server::Internal {
     /** Get the error message.
      */
     const std::string & get_error_message() const { return error_message; }
+
+    void queue_response(int connection_num, const std::string & response);
 };
 
 #endif /* XAPSRV_INCLUDED_SERVERINTERNAL_H */
