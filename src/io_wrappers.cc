@@ -59,6 +59,20 @@ io_write(int fd, const char * data, ssize_t len)
     return true;
 }
 
+int
+io_write_some(int fd, const char * data, ssize_t len)
+{
+    if (len == 0) return 0;
+    while (true) {
+	ssize_t c = write(fd, data, len);
+	if (c < 0) {
+	    if (errno == EINTR) continue;
+	    return -1;
+	}
+	return c;
+    }
+}
+
 bool
 io_close(int fd)
 {
@@ -96,4 +110,22 @@ io_read_exact(std::string & result, int fd, size_t to_read)
 	if (errno != EINTR) return false;
     }
     return true;
+}
+
+bool
+io_read_append(std::string & result, int fd, size_t max_to_read)
+{
+    while (true) {
+	char buf[max_to_read];
+	ssize_t bytes_read = read(fd, buf, max_to_read);
+
+	if (bytes_read == 0) {
+	    return true;
+	} else if (bytes_read > 0) {
+	    result.append(buf, bytes_read);
+	    return true;
+	} else {
+	    if (errno != EINTR) return false;
+	}
+    }
 }
