@@ -27,15 +27,18 @@
 #include "server.h"
 #include "serverinternal.h"
 
+#include <algorithm>
 #include <errno.h>
 #include "io_wrappers.h"
 #include <pthread.h>
 #include "signals.h"
 #include "settings.h"
+#include "str.h"
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include "utils.h"
+#include "worker.h"
 
 Server::Server(const ServerSettings & settings)
 	: internal(new Server::Internal(settings))
@@ -65,8 +68,8 @@ Server::Internal::Internal(const ServerSettings & settings_)
 	  logger(settings_.log_filename),
 	  started(false),
 	  shutting_down(false),
-	  shutdown_pipe_write_end(-1),
-	  shutdown_pipe_read_end(-1),
+	  nudge_write_end(-1),
+	  nudge_read_end(-1),
 	  error_message()
 {
 }
@@ -92,8 +95,8 @@ Server::Internal::run()
 	    set_sys_error("Couldn't create internal socketpair", errno);
 	    return false;
 	}
-	shutdown_pipe_write_end = fds[0];
-	shutdown_pipe_read_end = fds[1];
+	nudge_write_end = fds[0];
+	nudge_read_end = fds[1];
     }
     set_up_signal_handlers(this);
     try {
@@ -103,16 +106,16 @@ Server::Internal::run()
 	}
 
 	release_signal_handlers();
-	if (!io_close(shutdown_pipe_write_end)) {
+	if (!io_close(nudge_write_end)) {
 	    set_sys_error("Couldn't close internal socketpair", errno);
 	}
-	if (!io_close(shutdown_pipe_read_end)) {
+	if (!io_close(nudge_read_end)) {
 	    set_sys_error("Couldn't close internal socketpair", errno);
 	}
     } catch(...) {
 	release_signal_handlers();
-	(void)io_close(shutdown_pipe_write_end);
-	(void)io_close(shutdown_pipe_read_end);
+	(void)io_close(nudge_write_end);
+	(void)io_close(nudge_read_end);
 	throw;
     }
     return error_message.empty();
@@ -124,12 +127,28 @@ Server::Internal::mainloop()
     while (true) {
 	int maxfd = 0;
 	fd_set rfds;
+	fd_set wfds;
 	FD_ZERO(&rfds);
-	FD_SET(shutdown_pipe_read_end, &rfds);
-	if (shutdown_pipe_read_end > maxfd)
-	    maxfd = shutdown_pipe_read_end;
+	FD_ZERO(&wfds);
+	FD_SET(nudge_read_end, &rfds);
+	if (nudge_read_end > maxfd)
+	    maxfd = nudge_read_end;
 
-	int ret = select(maxfd + 1, &rfds, NULL, NULL, NULL);
+	// Mark all the filedescriptors that Connections are interested in.
+	std::map<int, Connection>::iterator i;
+	for (i = connections.begin(); i != connections.end(); ++i) {
+	    FD_SET(i->second.read_fd, &rfds);
+	    if (i->second.read_fd > maxfd)
+		maxfd = i->second.read_fd;
+	    if (!i->second.write_buf.empty()) {
+		FD_SET(i->second.write_fd, &wfds);
+		if (i->second.write_fd > maxfd)
+		    maxfd = i->second.write_fd;
+	    }
+	}
+
+	// Wait for one of the filedescriptors to be ready
+	int ret = select(maxfd + 1, &rfds, &wfds, NULL, NULL);
 	if (ret == -1) {
 	    if (errno == EINTR) continue;
 	    set_sys_error("Select failed", errno);
@@ -139,13 +158,35 @@ Server::Internal::mainloop()
 	    continue;
 	}
 
-	if (FD_ISSET(shutdown_pipe_read_end, &rfds)) {
-	    // Listen for a byte on the shutdown pipe.
+	// Check the nudge pipe
+	if (FD_ISSET(nudge_read_end, &rfds)) {
 	    std::string result;
-	    if (!io_read_exact(result, shutdown_pipe_read_end, 1)) {
+	    if (!io_read_exact(result, nudge_read_end, 1)) {
 		set_sys_error("Couldn't read from internal socket", errno);
 	    }
-	    return;
+	    if (result.empty() || result == "S") {
+		// Shutdown
+		return;
+	    }
+	}
+
+	// Check each connection's file descriptors.
+	for (i = connections.begin(); i != connections.end(); ++i) {
+	    if (FD_ISSET(i->second.read_fd, &rfds)) {
+		if (!io_read_append(i->second.read_buf,
+				    i->second.read_fd, 65536)) {
+		    logger.syserr("Failed to read from fd " +
+				  str(i->second.read_fd));
+		}
+		// Dispatch all the requests in the buffer.
+		while (dispatch_request(i->second.read_buf)) {}
+	    }
+	    if (FD_ISSET(i->second.write_fd, &wfds)) {
+		if (!io_write_some(i->second.write_fd, i->second.write_buf)) {
+		    logger.syserr("Failed to write to fd " +
+				  str(i->second.write_fd));
+		}
+	    }
 	}
     }
 }
@@ -153,7 +194,7 @@ Server::Internal::mainloop()
 void
 Server::Internal::shutdown()
 {
-    (void) io_write(shutdown_pipe_write_end, "S");
+    (void) io_write(nudge_write_end, "S");
 }
 
 void
@@ -171,29 +212,12 @@ Server::Internal::set_sys_error(const std::string & message, int errno_value)
     error_message = message + ": " + get_sys_error(errno_value);
 }
 
-#if 0
-/** Thread start-point for mainloop thread. */
-static void
-run_main_thread(void * arg_ptr)
-{
-    Server::Internal * arg = reinterpret_cast<Server::Internal *>(arg_ptr);
-    arg->mainloop();
-}
-#endif
-
 bool
 Server::Internal::start_listening()
 {
-#if 0
-    // Start the main thread.
-    {
-	ret = pthread_create(&main_thread, NULL, run_main_thread, this);
-	if (ret == -1) {
-	    set_sys_error("Couldn't create main thread", errno);
-	    return false;
-	}
+    if (settings.use_stdio) {
+	connections[0] = Connection(0, 1);
     }
-#endif
 
     return true;
 }

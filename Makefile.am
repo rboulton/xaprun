@@ -24,20 +24,26 @@ noinst_HEADERS = \
 	src/serverinternal.h \
 	src/settings.h \
 	src/signals.h \
-	src/utils.h
+	src/utils.h \
+	src/worker.h \
+	src/workerpool.h
 
 AM_LDFLAGS =
 
 xappy_server_SOURCES = \
 	ext/str.cc \
 	src/cli.cc \
+	src/dispatch.cc \
 	src/io_wrappers.cc \
 	src/logger.cc \
 	src/server.cc \
 	src/settings.cc \
 	src/signals.cc \
-	src/utils.cc
+	src/utils.cc \
+	src/worker.cc \
+	src/workerpool.cc
 
 xappy_server_LDADD = $(XAPIAN_LIBS)
+xappy_server_LDFLAGS = -pthread
 
 DISTCHECK_CONFIGURE_FLAGS = "XAPIAN_CONFIG=$(XAPIAN_CONFIG)"
