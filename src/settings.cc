@@ -35,7 +35,8 @@
 #define PROG_DESC "server for xapian"
 
 ServerSettings::ServerSettings()
-	: interface("0.0.0.0"),
+	: use_stdio(false),
+	  interface("0.0.0.0"),
 	  log_filename("log"),
 	  port(8080),
 	  search_workers(10),
@@ -54,6 +55,7 @@ ServerSettings::parse_args(int argc, char ** argv)
 	{ "searchers",  required_argument,      NULL, 's' },
 	{ "updaters",   required_argument,      NULL, 'u' },
 	{ "log",        required_argument,      NULL, 'l' },
+	{ "stdio",      no_argument,            NULL, 'o' },
 	{ 0, 0, NULL, 0 }
     };
 
@@ -74,8 +76,9 @@ ServerSettings::parse_args(int argc, char ** argv)
 "  -s, --searchers   Set the maximum number of concurrent search workers\n"
 "  -u, --updaters    Set the maximum number of concurrent update workers\n"
 "  -l, --log         Set the filename to write log entries to\n"
-"  -h, --help        display this help and exit\n"
-"  -v, --version     output version information and exit\n"
+"  -h, --help        Display this help and exit\n"
+"  -v, --version     Output version information and exit\n"
+"  --stdio           Listen on stdin, and write on stdout\n"
 << std::endl;
 		return 0;
 	    }
@@ -84,6 +87,10 @@ ServerSettings::parse_args(int argc, char ** argv)
 "Using xapian version "XAPIAN_VERSION
 << std::endl;
 		return 0;
+	    }
+	    case 'o': {
+		use_stdio = true;
+		break;
 	    }
 	    case 'i': {
 		interface = optarg;

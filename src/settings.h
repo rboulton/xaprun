@@ -30,6 +30,9 @@
 /** The settings used by the server.
  */
 struct ServerSettings {
+    /// If true - listen on stdin.
+    bool use_stdio;
+
     /// The interface which the server listens on.
     std::string interface;
 
