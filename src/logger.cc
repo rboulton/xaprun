@@ -65,6 +65,8 @@ Logger::log(char type, const std::string & msg)
 
     std::string line(1, type);
     line.append(str(getpid()));
+    line.append(".", 2);
+    line.append(str(pthread_self()));
     line.append(": ", 2);
     line.append(msg);
     line.append(1, '\n');
@@ -80,6 +82,11 @@ Logger::syserr(const std::string & msg)
     log('E', msg + ": " + strerror(errno));
 }
 
+void
+Logger::fatal(const std::string & msg)
+{
+    log('F', msg);
+}
 void
 Logger::info(const std::string & msg)
 {

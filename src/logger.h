@@ -25,6 +25,7 @@
 #ifndef XAPSRV_INCLUDED_LOGGER_H
 #define XAPSRV_INCLUDED_LOGGER_H
 
+#include <pthread.h>
 #include <string>
 
 class Logger {
@@ -46,6 +47,9 @@ class Logger {
 
     /// Make a log entry for an error, including information from errno.
     void syserr(const std::string & msg);
+
+    /// Make a log entry for a fatal error.
+    void fatal(const std::string & msg);
 
     /// Make a log entry giving general information about the server status.
     void info(const std::string & msg);
