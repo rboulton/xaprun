@@ -26,29 +26,202 @@
 #include <config.h>
 #include "workerpool.h"
 
+#include <assert.h>
 #include "worker.h"
 
-WorkerPool::~WorkerPool()
-{
-    for (std::vector<Worker *>::iterator i = workers.begin();
-	 i != workers.end(); ++i) {
-	(*i)->stop();
-    }
-    while (!workers.empty()) {
-	workers.back()->join();
-	delete workers.back();
-	workers.pop_back();
-    }
-}
-
 void
-WorkerPool::add_worker(Worker * worker)
+WorkerPool::add_worker(Worker * worker, const std::string & group)
 {
     try {
-	workers.push_back(NULL);
+	workers.insert(std::make_pair(worker, WorkerDetails(group)));
     } catch(...) {
 	delete worker;
 	throw;
     }
-    workers.back() = worker;
+
+    // Add the worker to `workers_by_group`
+    std::map<std::string, std::set<Worker *> >::iterator i;
+    i = workers_by_group.find(group);
+    if (i == workers_by_group.end()) {
+	std::pair<std::map<std::string, std::set<Worker *> >::iterator,
+		bool> j;
+	j = workers_by_group.insert(
+		std::make_pair(group, std::set<Worker *>()));
+	i = j.first;
+	assert(j.second);
+    }
+    i->second.insert(worker);
 }
+
+bool
+WorkerPool::remove_current_worker(Worker * worker)
+{
+    std::map<Worker *, WorkerDetails>::iterator i;
+    i = workers.find(worker);
+    if (i == workers.end())
+	return false;
+    std::map<std::string, std::set<Worker *> >::iterator j;
+    j = workers_by_group.find(i->second.group);
+    if (j == workers_by_group.end())
+	return false;
+
+    std::set<Worker *>::iterator k = j->second.find(worker);
+    if (k == j->second.end())
+	return false;
+    j->second.erase(k);
+    workers.erase(i);
+    return true;
+}
+
+void
+WorkerPool::request_exit(Worker * worker)
+{
+    if (!remove_current_worker(worker)) {
+	logger->error("Couldn't remove worker - not in list of current "
+		      "workers.  Possible resource leak.");
+    }
+    try {
+	exiting_workers.insert(worker);
+    } catch(...) {
+	logger->error("Couldn't add worker to list of exiting workers. "
+		      "Possible resource leak.");
+	throw;
+    }
+    worker->stop();
+}
+
+void
+WorkerPool::do_send_to_worker(const std::string & group,
+			      int connection_num,
+			      const std::string & msg)
+{
+    // Look for a worker with no messages waiting.
+    std::map<std::string, std::set<Worker *> >::iterator i;
+    std::map<Worker *, WorkerDetails>::iterator k;
+    Worker * worker = k->first;
+    bool found = false;
+
+    i = workers_by_group.find(group);
+    if (i != workers_by_group.end()) {
+	std::set<Worker *>::iterator j;
+	for (j = i->second.begin(); j != i->second.end(); ++j) {
+	    k = workers.find(*j);
+	    assert(k != workers.end());
+	    if (k->second.messages == 0) {
+		found = true;
+		break;
+	    }
+	}
+    }
+    if (found) {
+	worker = k->first;
+    } else {
+	// FIXME - queue the message if can't, or shouldn't, make the
+	// worker.
+	worker = factory->get_worker(group, 0);
+	add_worker(worker, group);
+	k = workers.find(worker);
+	assert(k != workers.end());
+	assert(k->first == worker);
+	assert(k->second.messages == 0);
+    }
+    worker->send_message(connection_num, msg);
+}
+
+WorkerPool::WorkerPool(Logger * logger_)
+	: logger(logger_), factory(NULL)
+{
+    pthread_mutex_init(&workerlist_mutex, NULL);
+}
+
+WorkerPool::~WorkerPool()
+{
+    pthread_mutex_destroy(&workerlist_mutex);
+
+    {
+	// Cleanup current workers.
+	std::map<Worker *, WorkerDetails>::iterator i;
+	for (i = workers.begin(); i != workers.end(); ++i) {
+	    i->first->stop();
+	}
+	for (i = workers.begin(); i != workers.end(); ++i) {
+	    i->first->join();
+	    delete i->first;
+	}
+    }
+    {
+	// Cleanup exiting workers.
+	std::set<Worker *>::iterator i;
+	for (i = exiting_workers.begin(); i != exiting_workers.end(); ++i) {
+	    (*i)->join();
+	    delete *i;
+	}
+    }
+    {
+	// Cleanup exited workers.
+	while (!exited_workers.empty()) {
+	    exited_workers.front()->join();
+	    delete exited_workers.front();
+	    exited_workers.pop();
+	}
+    }
+}
+
+void
+WorkerPool::set_factory(WorkerFactory * factory_)
+{
+    factory = factory_;
+}
+
+void
+WorkerPool::worker_message_handled(Worker * worker, bool ready_to_exit)
+{
+    pthread_mutex_lock(&workerlist_mutex);
+    try {
+	std::map<Worker *, WorkerDetails>::iterator i;
+	i = workers.find(worker);
+	assert(i != workers.end());
+	assert(i->second.messages > 0);
+	--(i->second.messages);
+	if (ready_to_exit && i->second.messages == 0) {
+	    i->second.ready_to_exit = true;
+	}
+    } catch(...) {
+	pthread_mutex_unlock(&workerlist_mutex);
+	throw;
+    }
+    pthread_mutex_unlock(&workerlist_mutex);
+}
+
+void
+WorkerPool::worker_exited(Worker * worker)
+{
+    pthread_mutex_lock(&workerlist_mutex);
+    try {
+	if (!remove_current_worker(worker)) {
+	    exiting_workers.erase(worker);
+	}
+	// FIXME - possible memory leak here if we get an exception.
+	exited_workers.push(worker);
+    } catch(...) {
+	pthread_mutex_unlock(&workerlist_mutex);
+	throw;
+    }
+    pthread_mutex_unlock(&workerlist_mutex);
+}
+
+void
+WorkerPool::send_to_worker(const std::string & group,
+			      int connection_num,
+			      const std::string & msg)
+{
+    pthread_mutex_lock(&workerlist_mutex);
+    try {
+	do_send_to_worker(group, connection_num, msg);
+    } catch(...) {
+	pthread_mutex_unlock(&workerlist_mutex);
+	throw;
+    }
+    pthread_mutex_unlock(&workerlist_mutex);
+}
+

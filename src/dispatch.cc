@@ -24,7 +24,6 @@
  */
 
 #include <config.h>
-#include "serverinternal.h"
 #include "workerpool.h"
 #include "worker.h"
 
@@ -34,8 +33,7 @@ Server::Internal::dispatch_request(int connection_num, std::string & buf)
     if (buf.empty()) {
 	return false;
     }
-    if (workers.send_to_worker("echo", connection_num, buf)) {
-	buf.clear();
-    }
+    workers.send_to_worker("echo", connection_num, buf);
+    buf.clear();
     return true;
 }

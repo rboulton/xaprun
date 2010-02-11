@@ -44,6 +44,15 @@ class StopWorkerException {
     const std::string & get_message() const { return message; }
 };
 
+struct Message {
+    int connection_num;
+    std::string msg;
+    Message() {}
+    Message(int connection_num_, const std::string & msg_)
+	    : connection_num(connection_num_), msg(msg_)
+    {}
+};
+
 class Worker {
     /// The server internals controling this worker.
     Server::Internal * server;
@@ -55,7 +64,7 @@ class Worker {
      *
      *  message_mutex must be held when accessing this.
      */
-    std::queue<std::string> messages;
+    std::queue<Message> messages;
 
     /** Flag, set to true when a stop has been requested.
      *
@@ -110,7 +119,11 @@ class Worker {
      *  before the worker exits (except in the case of an unclean emergency
      *  shutdown of the server).
      */
-    std::string wait_for_message(bool ready_to_exit);
+    Message wait_for_message(bool ready_to_exit);
+
+    /** Send a response to a connection.
+     */
+    void send_response(int connection_num, const std::string & msg);
 
   public:
     /** Create a new worker.
@@ -137,7 +150,7 @@ class Worker {
 
     /** Send a message to the worker.
      */
-    void send_message(const std::string & msg);
+    void send_message(int connection_num, const std::string & msg);
 
     /** Called to start the worker thread.
      */

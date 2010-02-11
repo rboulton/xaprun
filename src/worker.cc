@@ -52,10 +52,10 @@ Worker::~Worker()
     pthread_mutex_destroy(&message_mutex);
 }
 
-std::string
+Message
 Worker::wait_for_message(bool ready_to_exit)
 {
-    std::string result;
+    Message result;
 
     if (had_message) {
 	// Tell the pool we've handled a message.
@@ -84,6 +84,12 @@ Worker::wait_for_message(bool ready_to_exit)
     if (pthread_mutex_unlock(&message_mutex) != 0)
 	throw StopWorkerException();
     return result;
+}
+
+void
+Worker::send_response(int connection_num, const std::string & msg)
+{
+    server->queue_response(connection_num, msg);
 }
 
 static void *
@@ -152,12 +158,12 @@ Worker::join()
 }
 
 void
-Worker::send_message(const std::string & msg)
+Worker::send_message(int connection_num, const std::string & msg)
 {
     if (pthread_mutex_lock(&message_mutex) != 0)
 	server->set_sys_error("Can't get lock on worker to send message to it",
 			      errno);
-    messages.push(msg);
+    messages.push(Message(connection_num, msg));
     (void) pthread_cond_signal(&message_cond);
     if (pthread_mutex_unlock(&message_mutex) != 0)
 	server->set_sys_error("Can't release lock on worker after sending "

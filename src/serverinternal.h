@@ -77,6 +77,8 @@ class Server::Internal {
     std::string error_message;
 
     /** The connections to listen on and write responses to.
+     *
+     *  The connection numbers must be >= 0.
      */
     std::map<int, Connection> connections;
 
