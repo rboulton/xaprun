@@ -31,7 +31,11 @@
 bool
 Server::Internal::dispatch_request(int connection_num, std::string & buf)
 {
-    (void) connection_num;
-    (void) buf;
-    return false;
+    if (buf.empty()) {
+	return false;
+    }
+    if (workers.send_to_worker("echo", connection_num, buf)) {
+	buf.clear();
+    }
+    return true;
 }
