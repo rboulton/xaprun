@@ -158,6 +158,8 @@ class Server::Internal {
      */
     const std::string & get_error_message() const { return error_message; }
 
+    /** Queue a response for sending back to the server.
+     */
     void queue_response(int connection_num, const std::string & response);
 };
 
