@@ -79,13 +79,13 @@ Logger::log(char type, const std::string & msg)
 void
 Logger::syserr(const std::string & msg)
 {
-    log('E', msg + ": " + strerror(errno));
+    log('S', msg + ": " + strerror(errno));
 }
 
 void
-Logger::fatal(const std::string & msg)
+Logger::error(const std::string & msg)
 {
-    log('F', msg);
+    log('E', msg);
 }
 void
 Logger::info(const std::string & msg)

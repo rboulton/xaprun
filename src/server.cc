@@ -219,7 +219,7 @@ void
 Server::Internal::set_sys_error(const std::string & message, int errno_value)
 {
     std::string new_message = message + ": " + get_sys_error(errno_value);
-    logger.fatal(new_message);
+    logger.error(new_message);
     if (!error_message.empty()) {
 	// Don't overwrite an error condition set earlier
 	return;

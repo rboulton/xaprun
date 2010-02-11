@@ -48,8 +48,8 @@ class Logger {
     /// Make a log entry for an error, including information from errno.
     void syserr(const std::string & msg);
 
-    /// Make a log entry for a fatal error.
-    void fatal(const std::string & msg);
+    /// Make a log entry for an error.
+    void error(const std::string & msg);
 
     /// Make a log entry giving general information about the server status.
     void info(const std::string & msg);
