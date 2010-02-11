@@ -103,16 +103,17 @@ class Worker {
     pthread_mutex_t message_mutex;
 
   protected:
+
     /** Wait for a message to be received.
      *
      *  If stop() is called on the worker, this may raise a
      *  StopWorkerException, which must be allowed to pass through the caller
      *
      *  @returns a message indicating the next task to do.  Interpreting this
-     *  message is entirely up to the subclass, with the exception that an
-     *  empty message is a request for the worker to clean up after itself -
-     *  the next call to wait_for_message() after an empty message should
-     *  have the `ready_to_exit` parameter set to True.
+     *  message is entirely up to the subclass, with the exception that a
+     *  message with a negative connection number is a request for the worker
+     *  to clean up after itself - the next call to wait_for_message() after an
+     *  empty message should have the `ready_to_exit` parameter set to True.
      *
      *  @param ready_to_exit True if the worker has no significant work to do
      *  before exiting.  The worker's cleanup() method will still be called
