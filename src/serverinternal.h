@@ -28,7 +28,6 @@
 
 #include "logger.h"
 #include <queue>
-#include "server.h"
 #include "settings.h"
 #include <map>
 #include "workerpool.h"
@@ -48,7 +47,7 @@ struct Connection {
     {}
 };
 
-class Server::Internal {
+class ServerInternal {
     /// The settings used by this server.
     const ServerSettings & settings;
 
@@ -116,13 +115,17 @@ class Server::Internal {
      */
     bool dispatch_request(int connection_num, std::string & buf);
 
+    /** Create the worker factory.
+     */
+    void set_worker_factory();
+
     /** Dispatch all responses which are ready.
      */
     bool dispatch_responses();
 
   public:
-    Internal(const ServerSettings & settings_);
-    ~Internal();
+    ServerInternal(const ServerSettings & settings_);
+    ~ServerInternal();
 
     /** Start up and run the server.
      */

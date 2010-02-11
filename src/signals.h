@@ -30,11 +30,11 @@
 
 /** Set up all the signal handlers we care about.
  *
- *  @param internal The Server::Internals which the signal handlers will send
+ *  @param internal The ServerInternals which the signal handlers will send
  *  messages to.
  */
 bool
-set_up_signal_handlers(Server::Internal * internal);
+set_up_signal_handlers(ServerInternal * internal);
 
 void
 release_signal_handlers();

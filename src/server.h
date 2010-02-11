@@ -28,14 +28,14 @@
 
 #include "settings.h"
 
+class ServerInternal;
 class Server {
   public:
-    class Internal;
     /** @internal Internal state.
      *
      *  These are exposed to avoid needing to friend other internal classes.
      */
-    Internal * internal;
+    ServerInternal * internal;
 
     /** Create a server.
      *

@@ -41,7 +41,7 @@
 #include "worker.h"
 
 Server::Server(const ServerSettings & settings)
-	: internal(new Server::Internal(settings))
+	: internal(new ServerInternal(settings))
 {
 }
 
@@ -63,7 +63,7 @@ Server::get_error_message() const
 }
 
 
-Server::Internal::Internal(const ServerSettings & settings_)
+ServerInternal::ServerInternal(const ServerSettings & settings_)
 	: settings(settings_),
 	  logger(settings_.log_filename),
 	  started(false),
@@ -74,15 +74,16 @@ Server::Internal::Internal(const ServerSettings & settings_)
 	  workers(&logger)
 {
     pthread_mutex_init(&outgoing_message_mutex, NULL);
+    set_worker_factory();
 }
 
-Server::Internal::~Internal()
+ServerInternal::~ServerInternal()
 {
     pthread_mutex_destroy(&outgoing_message_mutex);
 }
 
 bool
-Server::Internal::run()
+ServerInternal::run()
 {
     if (started || shutting_down) {
 	// Exit immediately, without an error.
@@ -127,7 +128,7 @@ Server::Internal::run()
 }
 
 void
-Server::Internal::mainloop()
+ServerInternal::mainloop()
 {
     while (true) {
 	int maxfd = 0;
@@ -203,20 +204,20 @@ Server::Internal::mainloop()
 }
 
 void
-Server::Internal::shutdown()
+ServerInternal::shutdown()
 {
     logger.info("Received shutdown request");
     (void) io_write(nudge_write_end, "S");
 }
 
 void
-Server::Internal::emergency_shutdown()
+ServerInternal::emergency_shutdown()
 {
     logger.info("Performing emergency shutdown");
 }
 
 void
-Server::Internal::set_sys_error(const std::string & message, int errno_value)
+ServerInternal::set_sys_error(const std::string & message, int errno_value)
 {
     std::string new_message = message + ": " + get_sys_error(errno_value);
     logger.error(new_message);
@@ -228,7 +229,7 @@ Server::Internal::set_sys_error(const std::string & message, int errno_value)
 }
 
 bool
-Server::Internal::start_listening()
+ServerInternal::start_listening()
 {
     if (settings.use_stdio) {
 	logger.info("Listening on stdio");
@@ -241,13 +242,13 @@ Server::Internal::start_listening()
 }
 
 void
-Server::Internal::stop_listening()
+ServerInternal::stop_listening()
 {
     // FIXME - stop listening on tcp interface
 }
 
 bool
-Server::Internal::dispatch_responses()
+ServerInternal::dispatch_responses()
 {
     if (pthread_mutex_lock(&outgoing_message_mutex) != 0) {
 	set_sys_error("Couldn't lock outgoing message mutex", errno);
@@ -280,7 +281,7 @@ Server::Internal::dispatch_responses()
 }
 
 void
-Server::Internal::queue_response(int connection_num,
+ServerInternal::queue_response(int connection_num,
 				 const std::string & response)
 {
     if (pthread_mutex_lock(&outgoing_message_mutex) != 0) {

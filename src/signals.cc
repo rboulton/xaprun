@@ -36,7 +36,7 @@
 #include <unistd.h>
 
 /// Global variable pointing to the server shutdown pipe - used for cleanup.
-Server::Internal * g_server;
+ServerInternal * g_server;
 
 /// Global variable holding the server PID - used to only cleanup in right pid.
 pid_t g_server_pid;
@@ -105,7 +105,7 @@ handle_sig(int signum)
 }
 
 bool
-set_up_signal_handlers(Server::Internal * internal)
+set_up_signal_handlers(ServerInternal * internal)
 {
     struct sigaction act;
     g_server = internal;

@@ -35,10 +35,17 @@
 
 // Forward declaration
 class Worker;
+class WorkerPool;
+class ServerInternal;
 
 class WorkerFactory
 {
   public:
+    ServerInternal * server;
+    WorkerPool * pool;
+    WorkerFactory(ServerInternal * server_,
+		  WorkerPool * pool_) : server(server_), pool(pool_) {}
+
     /** Get a newly allocated worker for the given group.
      *
      *  This may return NULL if there are already the maximum number of workers
@@ -146,6 +153,8 @@ class WorkerPool {
     ~WorkerPool();
 
     /** Set the factory to use to make workers.
+     *
+     *  Ownership of the factory will be taken by the pool.
      */
     void set_factory(WorkerFactory * factory_);
 

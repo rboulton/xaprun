@@ -31,7 +31,7 @@
 #include <errno.h>
 #include "serverinternal.h"
 
-Worker::Worker(Server::Internal * server_, WorkerPool * pool_)
+Worker::Worker(ServerInternal * server_, WorkerPool * pool_)
 	: server(server_),
 	  pool(pool_),
 	  messages(),

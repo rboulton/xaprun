@@ -165,6 +165,8 @@ WorkerPool::~WorkerPool()
 	    exited_workers.pop();
 	}
     }
+
+    delete factory;
 }
 
 void

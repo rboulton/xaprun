@@ -55,7 +55,7 @@ struct Message {
 
 class Worker {
     /// The server internals controling this worker.
-    Server::Internal * server;
+    ServerInternal * server;
 
     /// The worker pool controlling this worker.
     WorkerPool * pool;
@@ -129,7 +129,7 @@ class Worker {
   public:
     /** Create a new worker.
      */
-    Worker(Server::Internal * server_, WorkerPool * pool_);
+    Worker(ServerInternal * server_, WorkerPool * pool_);
 
     /** Clean up after the worker.
      */
