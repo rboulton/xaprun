@@ -90,13 +90,20 @@ static void *
 run_worker_thread(void * arg_ptr)
 {
     Worker * worker = reinterpret_cast<Worker*>(arg_ptr);
+    worker->do_run();
+    return NULL;
+}
+
+void
+Worker::do_run()
+{
     try {
-	worker->run();
+	run();
     } catch (StopWorkerException & e) {
 	// Do nothing
     }
-    worker->cleanup();
-    return NULL;
+    cleanup();
+    pool->worker_exited(this);
 }
 
 bool

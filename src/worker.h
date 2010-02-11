@@ -139,6 +139,10 @@ class Worker {
      */
     void send_message(const std::string & msg);
 
+    /** Called to start the worker thread.
+     */
+    void do_run();
+
     /** Main method of the worker.
      *
      *  This should call wait_for_message() to get messages, 
