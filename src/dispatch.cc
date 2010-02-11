@@ -25,6 +25,7 @@
 
 #include <config.h>
 #include "serverinternal.h"
+#include "str.h"
 #include "worker.h"
 #include "workerpool.h"
 

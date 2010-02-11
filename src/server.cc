@@ -28,6 +28,7 @@
 #include "serverinternal.h"
 
 #include <algorithm>
+#include <assert.h>
 #include <errno.h>
 #include "io_wrappers.h"
 #include <pthread.h>
@@ -194,9 +195,13 @@ ServerInternal::mainloop()
 		while (dispatch_request(i->first, i->second.read_buf)) {}
 	    }
 	    if (FD_ISSET(i->second.write_fd, &wfds)) {
-		if (!io_write_some(i->second.write_fd, i->second.write_buf)) {
+		int written = io_write_some(i->second.write_fd, i->second.write_buf);
+		if (written <= 0) {
 		    logger.syserr("Failed to write to fd " +
 				  str(i->second.write_fd));
+		} else {
+		    assert((size_t)written <= i->second.write_buf.size());
+		    i->second.write_buf.erase(0, written);
 		}
 	    }
 	}

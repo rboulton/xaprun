@@ -27,6 +27,7 @@
 #include "workerpool.h"
 
 #include <assert.h>
+#include "str.h"
 #include "worker.h"
 
 void
@@ -76,6 +77,7 @@ WorkerPool::remove_current_worker(Worker * worker)
 void
 WorkerPool::request_exit(Worker * worker)
 {
+    logger->info("Sending stop request to worker");
     if (!remove_current_worker(worker)) {
 	logger->error("Couldn't remove worker - not in list of current "
 		      "workers.  Possible resource leak.");
@@ -96,11 +98,10 @@ WorkerPool::do_send_to_worker(const std::string & group,
 			      const std::string & msg)
 {
     // Look for a worker with no messages waiting.
-    std::map<std::string, std::set<Worker *> >::iterator i;
     std::map<Worker *, WorkerDetails>::iterator k;
-    Worker * worker = k->first;
-    bool found = false;
+    Worker * worker = NULL;
 
+    std::map<std::string, std::set<Worker *> >::iterator i;
     i = workers_by_group.find(group);
     if (i != workers_by_group.end()) {
 	std::set<Worker *>::iterator j;
@@ -108,23 +109,24 @@ WorkerPool::do_send_to_worker(const std::string & group,
 	    k = workers.find(*j);
 	    assert(k != workers.end());
 	    if (k->second.messages == 0) {
-		found = true;
+		worker = k->first;
 		break;
 	    }
 	}
     }
-    if (found) {
-	worker = k->first;
-    } else {
+    if (!worker) {
 	// FIXME - queue the message if can't, or shouldn't, make the
 	// worker.
+	logger->info("Starting new worker");
 	worker = factory->get_worker(group, 0);
 	add_worker(worker, group);
 	k = workers.find(worker);
-	assert(k != workers.end());
-	assert(k->first == worker);
-	assert(k->second.messages == 0);
+	worker->start();
     }
+    logger->info("sending request from connection " + str(connection_num) +
+		 " to worker");
+    ++(k->second.messages);
+    k->second.ready_to_exit = false;
     worker->send_message(connection_num, msg);
 }
 
