@@ -70,7 +70,8 @@ Server::Internal::Internal(const ServerSettings & settings_)
 	  shutting_down(false),
 	  nudge_write_end(-1),
 	  nudge_read_end(-1),
-	  error_message()
+	  error_message(),
+	  workers(&logger)
 {
     pthread_mutex_init(&outgoing_message_mutex, NULL);
 }
@@ -204,12 +205,14 @@ Server::Internal::mainloop()
 void
 Server::Internal::shutdown()
 {
+    logger.info("Received shutdown request");
     (void) io_write(nudge_write_end, "S");
 }
 
 void
 Server::Internal::emergency_shutdown()
 {
+    logger.info("Performing emergency shutdown");
 }
 
 void
@@ -255,6 +258,8 @@ Server::Internal::dispatch_responses()
 	    int conn_num = outgoing_messages.front().first;
 	    std::map<int, Connection>::iterator i = connections.find(conn_num);
 	    if (i != connections.end()) {
+		logger.info("Dispatching response for connection " +
+			    str(conn_num));
 		i->second.write_buf.append(outgoing_messages.front().second);
 	    } else {
 		// log the inability to send the messsage
@@ -290,4 +295,5 @@ Server::Internal::queue_response(int connection_num,
     if (pthread_mutex_unlock(&outgoing_message_mutex) != 0) {
 	throw StopWorkerException("Couldn't unlock outgoing message mutex");
     }
+    (void) io_write(nudge_write_end, "R");
 }
