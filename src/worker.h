@@ -32,6 +32,8 @@
 #include <queue>
 #include <vector>
 
+class WorkerPool;
+
 /** Exception raised to stop a worker.
  */
 class StopWorkerException {
@@ -46,17 +48,38 @@ class Worker {
     /// The server internals controling this worker.
     Server::Internal * server;
 
+    /// The worker pool controlling this worker.
+    WorkerPool * pool;
+
     /** The messages received.
+     *
+     *  message_mutex must be held when accessing this.
      */
     std::queue<std::string> messages;
 
     /** Flag, set to true when a stop has been requested.
+     *
+     *  message_mutex must be held when accessing this.
      */
     bool stop_requested;
 
     /** Flag, set to true when worker is started.
+     *
+     *  This should only be accessed in the thread which started the worker.
      */
     bool started;
+
+    /** Flag, set to true when the thread has been joined.
+     *
+     *  This should only be accessed in the thread which started the worker.
+     */
+    bool joined;
+
+    /** Flag, set to true when the worker has first handled a message.
+     *
+     *  This should only be accessed in the worker thread.
+     */
+    bool had_message;
 
     /** The thread containing the worker.
      */
@@ -75,13 +98,24 @@ class Worker {
      *
      *  If stop() is called on the worker, this may raise a
      *  StopWorkerException, which must be allowed to pass through the caller
+     *
+     *  @returns a message indicating the next task to do.  Interpreting this
+     *  message is entirely up to the subclass, with the exception that an
+     *  empty message is a request for the worker to clean up after itself -
+     *  the next call to wait_for_message() after an empty message should
+     *  have the `ready_to_exit` parameter set to True.
+     *
+     *  @param ready_to_exit True if the worker has no significant work to do
+     *  before exiting.  The worker's cleanup() method will still be called
+     *  before the worker exits (except in the case of an unclean emergency
+     *  shutdown of the server).
      */
-    std::string wait_for_message();
+    std::string wait_for_message(bool ready_to_exit);
 
   public:
     /** Create a new worker.
      */
-    Worker(Server::Internal * server_);
+    Worker(Server::Internal * server_, WorkerPool * pool_);
 
     /** Clean up after the worker.
      */
@@ -114,7 +148,9 @@ class Worker {
     /** Cleanup the worker.
      *
      *  This will be called after the stop() method has been called, to give
-     *  the worker a chance to clean up after itself.
+     *  the worker a final chance to clean up after itself.
+     *
+     *  The default implementation does nothing.
      */
     virtual void cleanup();
 };
