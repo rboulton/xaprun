@@ -26,6 +26,7 @@
 #ifndef XAPSRV_INCLUDED_WORKERPOOL_H
 #define XAPSRV_INCLUDED_WORKERPOOL_H
 
+#include "locker.h"
 #include "logger.h"
 #include <map>
 #include <queue>
@@ -94,7 +95,7 @@ class WorkerPool {
 
     /** Mutex which must be held when accessing the list of workers.
      */
-    pthread_mutex_t workerlist_mutex;
+    Locker workerlist_mutex;
 
     /** For each current worker, the group that it is in, and the number of
      *  outstanding messages it has been sent.
@@ -181,6 +182,14 @@ class WorkerPool {
     void send_to_worker(const std::string & group,
 			int connection_num,
 			const std::string & msg);
+
+    /** Stop all workers.
+     */
+    void stop();
+
+    /** Join all workers.
+     */
+    void join();
 
 #if 0 
     /** Cancel any queued messages for a given connection.

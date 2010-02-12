@@ -133,13 +133,10 @@ WorkerPool::do_send_to_worker(const std::string & group,
 WorkerPool::WorkerPool(Logger * logger_)
 	: logger(logger_), factory(NULL)
 {
-    pthread_mutex_init(&workerlist_mutex, NULL);
 }
 
 WorkerPool::~WorkerPool()
 {
-    pthread_mutex_destroy(&workerlist_mutex);
-
     {
 	// Cleanup current workers.
 	std::map<Worker *, WorkerDetails>::iterator i;
@@ -180,52 +177,91 @@ WorkerPool::set_factory(WorkerFactory * factory_)
 void
 WorkerPool::worker_message_handled(Worker * worker, bool ready_to_exit)
 {
-    pthread_mutex_lock(&workerlist_mutex);
-    try {
-	std::map<Worker *, WorkerDetails>::iterator i;
-	i = workers.find(worker);
-	assert(i != workers.end());
-	assert(i->second.messages > 0);
-	--(i->second.messages);
-	if (ready_to_exit && i->second.messages == 0) {
-	    i->second.ready_to_exit = true;
-	}
-    } catch(...) {
-	pthread_mutex_unlock(&workerlist_mutex);
-	throw;
+    ContextLocker lock(workerlist_mutex);
+
+    std::map<Worker *, WorkerDetails>::iterator i;
+    i = workers.find(worker);
+    assert(i != workers.end());
+    assert(i->second.messages > 0);
+    --(i->second.messages);
+    if (ready_to_exit && i->second.messages == 0) {
+	i->second.ready_to_exit = true;
     }
-    pthread_mutex_unlock(&workerlist_mutex);
 }
 
 void
 WorkerPool::worker_exited(Worker * worker)
 {
-    pthread_mutex_lock(&workerlist_mutex);
-    try {
-	if (!remove_current_worker(worker)) {
-	    exiting_workers.erase(worker);
-	}
-	// FIXME - possible memory leak here if we get an exception.
-	exited_workers.push(worker);
-    } catch(...) {
-	pthread_mutex_unlock(&workerlist_mutex);
-	throw;
+    ContextLocker lock(workerlist_mutex);
+
+    if (!remove_current_worker(worker)) {
+	exiting_workers.erase(worker);
     }
-    pthread_mutex_unlock(&workerlist_mutex);
+    // FIXME - possible memory leak here if we get an exception.
+    exited_workers.push(worker);
 }
 
 void
 WorkerPool::send_to_worker(const std::string & group,
-			      int connection_num,
-			      const std::string & msg)
+			   int connection_num,
+			   const std::string & msg)
 {
-    pthread_mutex_lock(&workerlist_mutex);
-    try {
-	do_send_to_worker(group, connection_num, msg);
-    } catch(...) {
-	pthread_mutex_unlock(&workerlist_mutex);
-	throw;
-    }
-    pthread_mutex_unlock(&workerlist_mutex);
+    ContextLocker lock(workerlist_mutex);
+    do_send_to_worker(group, connection_num, msg);
 }
 
+void
+WorkerPool::stop()
+{
+    ContextLocker lock(workerlist_mutex);
+
+    logger->info("Stopping all workers");
+
+    while (!workers.empty()) {
+	Worker * worker = workers.begin()->first;
+	worker->stop();
+
+	if (!remove_current_worker(worker)) {
+	    logger->error("Couldn't remove worker - not in list of current "
+			  "workers.  Possible resource leak.");
+	}
+	try {
+	    exiting_workers.insert(worker);
+	} catch(...) {
+	    logger->error("Couldn't add worker to list of exiting workers. "
+			  "Possible resource leak.");
+	    throw;
+	}
+    }
+}
+
+void
+WorkerPool::join()
+{
+    ContextLocker lock(workerlist_mutex);
+
+    logger->info("Joining all workers");
+
+    // Cleanup exiting workers.
+    while (!exiting_workers.empty()) {
+	Worker * worker = *exiting_workers.begin();
+	lock.unlock();
+	worker->join();
+	lock.lock();
+	if (exiting_workers.erase(worker)) {
+	    delete worker;
+	    // If nothing was erased, it'll be in exited_workers now, and we'll
+	    // delete it later.
+	}
+    }
+
+    // Cleanup exited workers.
+    //
+    // No need to drop the lock while joining here, because workers shouldn't
+    // try to get the lock once they're in exited_workers.
+    while (!exited_workers.empty()) {
+	exited_workers.front()->join();
+	delete exited_workers.front();
+	exited_workers.pop();
+    }
+}

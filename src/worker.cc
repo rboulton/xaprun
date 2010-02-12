@@ -131,11 +131,11 @@ Worker::stop()
 {
     if (!started)
 	return;
-    pool->logger->info("Stopping worker");
     if (pthread_mutex_lock(&message_mutex) != 0)
 	server->set_sys_error("Can't get lock on worker to stop it", errno);
     if (!stop_requested) {
 	stop_requested = true;
+	pool->logger->info("Stopping worker");
 	(void) pthread_cond_signal(&message_cond);
     }
     if (pthread_mutex_unlock(&message_mutex) != 0)

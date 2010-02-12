@@ -109,6 +109,8 @@ ServerInternal::run()
 	if (start_listening()) {
 	    mainloop();
 	    stop_listening();
+	    workers.stop();
+	    workers.join();
 	}
 
 	release_signal_handlers();
