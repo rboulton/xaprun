@@ -18,30 +18,30 @@ dist_sysconf_DATA = xappy.conf
 
 noinst_HEADERS = \
 	ext/str.h \
-	src/io_wrappers.h \
-	src/logger.h \
-	src/server.h \
-	src/serverinternal.h \
+	src/server/io_wrappers.h \
+	src/server/logger.h \
+	src/server/server.h \
+	src/server/serverinternal.h \
+	src/server/signals.h \
+	src/server/worker.h \
+	src/server/workerpool.h \
 	src/settings.h \
-	src/signals.h \
-	src/utils.h \
-	src/worker.h \
-	src/workerpool.h
+	src/utils.h
 
 AM_LDFLAGS =
 
 xappy_server_SOURCES = \
 	ext/str.cc \
+	src/server/io_wrappers.cc \
+	src/server/logger.cc \
+	src/server/server.cc \
+	src/server/signals.cc \
+	src/server/worker.cc \
+	src/server/workerpool.cc \
 	src/cli.cc \
 	src/dispatch.cc \
-	src/io_wrappers.cc \
-	src/logger.cc \
-	src/server.cc \
 	src/settings.cc \
-	src/signals.cc \
-	src/utils.cc \
-	src/worker.cc \
-	src/workerpool.cc
+	src/utils.cc
 
 xappy_server_LDADD = $(XAPIAN_LIBS)
 xappy_server_LDFLAGS = -pthread

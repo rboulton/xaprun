@@ -25,7 +25,7 @@
 
 #include <config.h>
 
-#include "server.h"
+#include "server/server.h"
 #include "settings.h"
 #include <stdio.h>
 #include <stdlib.h>

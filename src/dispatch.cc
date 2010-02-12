@@ -24,10 +24,10 @@
  */
 
 #include <config.h>
-#include "serverinternal.h"
+#include "server/serverinternal.h"
+#include "server/worker.h"
+#include "server/workerpool.h"
 #include "str.h"
-#include "worker.h"
-#include "workerpool.h"
 
 class EchoWorker : public Worker {
   public:
