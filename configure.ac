@@ -4,7 +4,7 @@ AC_INIT([xappy-server], [0.1], [http://tartarus.org/richard/xappy-server/])
 AC_PREREQ([2.63])
 AM_INIT_AUTOMAKE([1.10.1 -Wportability tar-ustar])
 
-AC_CONFIG_SRCDIR([src/server.cc])
+AC_CONFIG_SRCDIR([src/settings.cc])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
 LT_PREREQ([2.2.6])
