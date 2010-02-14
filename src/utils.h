@@ -29,4 +29,10 @@
 
 std::string get_sys_error(int errno_value);
 
+/// Quote a url string (ie, replace unsafe characters with %XX values)
+std::string urlquote(const std::string & value);
+
+/// Unquote a url string (ie, replace %XX values with characters)
+std::string urlunquote(const std::string & value);
+
 #endif /* XAPSRV_INCLUDED_UTILS_H */

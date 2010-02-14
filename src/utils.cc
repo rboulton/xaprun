@@ -25,6 +25,7 @@
 #include <config.h>
 #include "utils.h"
 
+#include <ctype.h>
 #include "str.h"
 #include <string>
 #include <string.h>
@@ -51,4 +52,58 @@ get_sys_error(int errno_value)
 #else
     return std::string(strerror(errno_value));
 #endif
+}
+
+std::string
+urlquote(const std::string & value)
+{
+    std::string result;
+    for (std::string::size_type i = 0;
+	 i != value.size(); ++i) {
+	char ch = value[i];
+	if (isalnum(ch) || ch == '_' || ch == '-' || ch == '.') {
+	    result += ch;
+	} else {
+	    result += '%';
+	    result += "0123456789abcdef" [ch / 16];
+	    result += "0123456789abcdef" [ch % 16];
+	}
+    }
+    return result;
+}
+
+static int
+hex_to_int(char ch)
+{
+    if (ch >= '0' && ch <= '9')
+	return ch - '0';
+    if (ch >= 'A' && ch <= 'F')
+	return ch - 'A';
+    if (ch >= 'a' && ch <= 'f')
+	return ch - 'a';
+    return 0;
+}
+
+std::string
+urlunquote(const std::string & value)
+{
+    std::string result;
+    for (std::string::size_type i = 0;
+	 i != value.size(); ++i) {
+	char ch = value[i];
+	if (ch == '%') {
+	    if (i + 2 >= value.size()) {
+		result += value.substr(i, value.size() - i);
+		break;
+	    }
+	    char ch1 = value[i + 1];
+	    char ch2 = value[i + 1];
+	    i += 2;
+	    
+	    result += char(hex_to_int(ch1) * 16 + hex_to_int(ch2));
+	} else {
+	    result += ch;
+	}
+    }
+    return result;
 }
