@@ -149,6 +149,10 @@ class WorkerPool {
     void do_send_to_worker(const std::string & group,
 			   int connection_num,
 			   const std::string & msg);
+
+    // Don't allow copying or assignment.
+    WorkerPool(const WorkerPool & other);
+    void operator=(const WorkerPool & other);
   public:
     WorkerPool(Logger * logger_);
     ~WorkerPool();
