@@ -25,6 +25,7 @@ noinst_HEADERS = \
 	src/server/signals.h \
 	src/server/worker.h \
 	src/server/workerpool.h \
+	src/xappy/searchworker.h \
 	src/settings.h \
 	src/utils.h
 
@@ -38,8 +39,9 @@ xappy_server_SOURCES = \
 	src/server/signals.cc \
 	src/server/worker.cc \
 	src/server/workerpool.cc \
+	src/xappy/dispatch.cc \
+	src/xappy/searchworker.cc \
 	src/cli.cc \
-	src/dispatch.cc \
 	src/settings.cc \
 	src/utils.cc
 

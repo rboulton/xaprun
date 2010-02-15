@@ -53,6 +53,9 @@ class Logger {
 
     /// Make a log entry giving general information about the server status.
     void info(const std::string & msg);
+
+    /// Make a log entry giving debug information.
+    void debug(const std::string & msg);
 };
 
 #endif /* XAPSRV_INCLUDED_LOGGER_H */

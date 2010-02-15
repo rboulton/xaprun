@@ -27,11 +27,13 @@
 #define XAPSRV_INCLUDED_WORKER_H
 
 #include <pthread.h>
+#include <queue>
+#include "server.h"
 #include "serverinternal.h"
 #include <string>
-#include <queue>
 #include <vector>
 
+class Worker;
 class WorkerPool;
 
 /** Exception raised to stop a worker.
@@ -44,16 +46,10 @@ class StopWorkerException {
     const std::string & get_message() const { return message; }
 };
 
-struct Message {
-    int connection_num;
-    std::string msg;
-    Message() {}
-    Message(int connection_num_, const std::string & msg_)
-	    : connection_num(connection_num_), msg(msg_)
-    {}
-};
+class WorkerThread {
+    /// The worker for this thread.
+    Worker * worker;
 
-class Worker {
     /// The server internals controling this worker.
     ServerInternal * server;
 
@@ -102,7 +98,15 @@ class Worker {
      */
     pthread_mutex_t message_mutex;
 
-  protected:
+  public:
+    /** Create a new worker.
+     */
+    WorkerThread(ServerInternal * server_, WorkerPool * pool_,
+		 Worker * worker_);
+
+    /** Clean up after the worker.
+     */
+    ~WorkerThread();
 
     /** Wait for a message to be received.
      *
@@ -126,15 +130,6 @@ class Worker {
      */
     void send_response(int connection_num, const std::string & msg);
 
-  public:
-    /** Create a new worker.
-     */
-    Worker(ServerInternal * server_, WorkerPool * pool_);
-
-    /** Clean up after the worker.
-     */
-    ~Worker();
-
     /** Start the worker running (in a new thread).
      */
     bool start();
@@ -151,26 +146,11 @@ class Worker {
 
     /** Send a message to the worker.
      */
-    void send_message(int connection_num, const std::string & msg);
+    void send_message(const Message & msg);
 
     /** Called to start the worker thread.
      */
     void do_run();
-
-    /** Main method of the worker.
-     *
-     *  This should call wait_for_message() to get messages, 
-     */
-    virtual void run() = 0;
-
-    /** Cleanup the worker.
-     *
-     *  This will be called after the stop() method has been called, to give
-     *  the worker a final chance to clean up after itself.
-     *
-     *  The default implementation does nothing.
-     */
-    virtual void cleanup();
 };
 
 #endif /* XAPSRV_INCLUDED_WORKER_H */

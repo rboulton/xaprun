@@ -28,6 +28,7 @@
 
 #include "locker.h"
 #include "logger.h"
+#include "server.h"
 #include <map>
 #include <queue>
 #include <set>
@@ -35,32 +36,9 @@
 #include <vector>
 
 // Forward declaration
-class Worker;
-class WorkerPool;
+class Dispatcher;
 class ServerInternal;
-
-class WorkerFactory
-{
-  public:
-    ServerInternal * server;
-    WorkerPool * pool;
-    WorkerFactory(ServerInternal * server_,
-		  WorkerPool * pool_) : server(server_), pool(pool_) {}
-
-    /** Get a newly allocated worker for the given group.
-     *
-     *  This may return NULL if there are already the maximum number of workers
-     *  for that group.  In this case, an attempt to make the worker will be
-     *  made again later.
-     *
-     *  @param group The group that the worker is for.
-     *  @param current_workers The number of workers currently in that group.
-     *
-     *  @retval A new worker, or NULL if worker couldn't be allocated currently.
-     */
-    virtual Worker * get_worker(const std::string & group,
-				int current_workers) = 0;
-};
+class WorkerThread;
 
 /** Details about a worker.
  */
@@ -91,7 +69,9 @@ class WorkerPool {
     Logger * logger;
 
   private:
-    WorkerFactory * factory;
+    Dispatcher * dispatcher;
+
+    ServerInternal * server;
 
     /** Mutex which must be held when accessing the list of workers.
      */
@@ -100,30 +80,30 @@ class WorkerPool {
     /** For each current worker, the group that it is in, and the number of
      *  outstanding messages it has been sent.
      */
-    std::map<Worker *, WorkerDetails> workers;
+    std::map<WorkerThread *, WorkerDetails> workers;
 
     /** All the current workers, in each group.
      *
      *  The set of workers in this structure is identical to the set in
      *  `workers`.
      */
-    std::map<std::string, std::set<Worker *> > workers_by_group;
+    std::map<std::string, std::set<WorkerThread *> > workers_by_group;
 
     /** Workers which have been asked to stop.
      */
-    std::set<Worker *> exiting_workers;
+    std::set<WorkerThread *> exiting_workers;
 
     /** Workers which have exited.
      *
      *  These need to be joined and then deleted.
      */
-    std::queue<Worker *> exited_workers;
+    std::queue<WorkerThread *> exited_workers;
 
     /** Add a new worker.
      *
      *  workerlist_mutex must be held when this is called.
      */
-    void add_worker(Worker * worker, const std::string & group);
+    void add_worker(WorkerThread * worker, const std::string & group);
 
     /** Remove a worker from the list of current workers.
      *
@@ -132,36 +112,20 @@ class WorkerPool {
      *  @returns true if the worker was in the list of current workers, false
      *  otherwise.
      */
-    bool remove_current_worker(Worker * worker);
+    bool remove_current_worker(WorkerThread * worker);
 
     /** Request that a worker stops.
      *
      *  workerlist_mutex must be held when this is called.
      */
-    void request_exit(Worker * worker);
-
-    /** Send a message to a worker in a specified group.
-     *
-     *  workerlist_mutex must be held when this is called.
-     *
-     *  Creates the worker if necessary.
-     */
-    void do_send_to_worker(const std::string & group,
-			   int connection_num,
-			   const std::string & msg);
+    void request_exit(WorkerThread * worker);
 
     // Don't allow copying or assignment.
     WorkerPool(const WorkerPool & other);
     void operator=(const WorkerPool & other);
   public:
-    WorkerPool(Logger * logger_);
+    WorkerPool(Logger * logger_, Dispatcher * dispatcher_, ServerInternal * server_);
     ~WorkerPool();
-
-    /** Set the factory to use to make workers.
-     *
-     *  Ownership of the factory will be taken by the pool.
-     */
-    void set_factory(WorkerFactory * factory_);
 
     /** Called by a worker to indicate that it has handled one message.
      *
@@ -170,13 +134,13 @@ class WorkerPool {
      *
      *  The worker's mutex must not be held when this is called.
      */
-    void worker_message_handled(Worker * worker, bool ready_to_exit);
+    void worker_message_handled(WorkerThread * worker, bool ready_to_exit);
 
     /** Called by a worker to indicate that it has exited.
      *
      *  The worker's mutex must not be held when this is called.
      */
-    void worker_exited(Worker * worker);
+    void worker_exited(WorkerThread * worker);
 
     /** Try to send a message to a worker, creating one if needed.
      *
@@ -184,8 +148,7 @@ class WorkerPool {
      *  and passed to a worker later.
      */
     void send_to_worker(const std::string & group,
-			int connection_num,
-			const std::string & msg);
+			const Message & msg);
 
     /** Stop all workers.
      */

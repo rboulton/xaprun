@@ -27,11 +27,12 @@
 #include "workerpool.h"
 
 #include <assert.h>
+#include "server.h"
 #include "str.h"
 #include "worker.h"
 
 void
-WorkerPool::add_worker(Worker * worker, const std::string & group)
+WorkerPool::add_worker(WorkerThread * worker, const std::string & group)
 {
     try {
 	workers.insert(std::make_pair(worker, WorkerDetails(group)));
@@ -41,13 +42,13 @@ WorkerPool::add_worker(Worker * worker, const std::string & group)
     }
 
     // Add the worker to `workers_by_group`
-    std::map<std::string, std::set<Worker *> >::iterator i;
+    std::map<std::string, std::set<WorkerThread *> >::iterator i;
     i = workers_by_group.find(group);
     if (i == workers_by_group.end()) {
-	std::pair<std::map<std::string, std::set<Worker *> >::iterator,
+	std::pair<std::map<std::string, std::set<WorkerThread *> >::iterator,
 		bool> j;
 	j = workers_by_group.insert(
-		std::make_pair(group, std::set<Worker *>()));
+		std::make_pair(group, std::set<WorkerThread *>()));
 	i = j.first;
 	assert(j.second);
     }
@@ -55,18 +56,18 @@ WorkerPool::add_worker(Worker * worker, const std::string & group)
 }
 
 bool
-WorkerPool::remove_current_worker(Worker * worker)
+WorkerPool::remove_current_worker(WorkerThread * worker)
 {
-    std::map<Worker *, WorkerDetails>::iterator i;
+    std::map<WorkerThread *, WorkerDetails>::iterator i;
     i = workers.find(worker);
     if (i == workers.end())
 	return false;
-    std::map<std::string, std::set<Worker *> >::iterator j;
+    std::map<std::string, std::set<WorkerThread *> >::iterator j;
     j = workers_by_group.find(i->second.group);
     if (j == workers_by_group.end())
 	return false;
 
-    std::set<Worker *>::iterator k = j->second.find(worker);
+    std::set<WorkerThread *>::iterator k = j->second.find(worker);
     if (k == j->second.end())
 	return false;
     j->second.erase(k);
@@ -75,9 +76,9 @@ WorkerPool::remove_current_worker(Worker * worker)
 }
 
 void
-WorkerPool::request_exit(Worker * worker)
+WorkerPool::request_exit(WorkerThread * worker)
 {
-    logger->info("Sending stop request to worker");
+    logger->debug("Sending stop request to worker");
     if (!remove_current_worker(worker)) {
 	logger->error("Couldn't remove worker - not in list of current "
 		      "workers.  Possible resource leak.");
@@ -93,45 +94,48 @@ WorkerPool::request_exit(Worker * worker)
 }
 
 void
-WorkerPool::do_send_to_worker(const std::string & group,
-			      int connection_num,
-			      const std::string & msg)
+WorkerPool::send_to_worker(const std::string & group,
+			   const Message & msg)
 {
+    ContextLocker lock(workerlist_mutex);
     // Look for a worker with no messages waiting.
-    std::map<Worker *, WorkerDetails>::iterator k;
-    Worker * worker = NULL;
+    std::map<WorkerThread *, WorkerDetails>::iterator k;
+    WorkerThread * workerthread = NULL;
 
-    std::map<std::string, std::set<Worker *> >::iterator i;
+    std::map<std::string, std::set<WorkerThread *> >::iterator i;
     i = workers_by_group.find(group);
     if (i != workers_by_group.end()) {
-	std::set<Worker *>::iterator j;
+	std::set<WorkerThread *>::iterator j;
 	for (j = i->second.begin(); j != i->second.end(); ++j) {
 	    k = workers.find(*j);
 	    assert(k != workers.end());
 	    if (k->second.messages == 0) {
-		worker = k->first;
+		workerthread = k->first;
 		break;
 	    }
 	}
     }
-    if (!worker) {
+    if (!workerthread) {
 	// FIXME - queue the message if can't, or shouldn't, make the
 	// worker.
-	logger->info("Starting new worker");
-	worker = factory->get_worker(group, 0);
-	add_worker(worker, group);
-	k = workers.find(worker);
-	worker->start();
+	logger->debug("Starting new worker");
+	Worker * worker = dispatcher->get_worker(group, 0);
+	workerthread = new WorkerThread(server, this, worker);
+	worker->set_thread(workerthread);
+	add_worker(workerthread, group);
+	k = workers.find(workerthread);
+	workerthread->start();
     }
-    logger->info("sending request from connection " + str(connection_num) +
+    logger->debug("sending request from connection " + str(msg.connection_num) +
 		 " to worker");
     ++(k->second.messages);
     k->second.ready_to_exit = false;
-    worker->send_message(connection_num, msg);
+    workerthread->send_message(msg);
 }
 
-WorkerPool::WorkerPool(Logger * logger_)
-	: logger(logger_), factory(NULL)
+WorkerPool::WorkerPool(Logger * logger_, Dispatcher * dispatcher_,
+		       ServerInternal * server_)
+	: logger(logger_), dispatcher(dispatcher_), server(server_)
 {
 }
 
@@ -139,7 +143,7 @@ WorkerPool::~WorkerPool()
 {
     {
 	// Cleanup current workers.
-	std::map<Worker *, WorkerDetails>::iterator i;
+	std::map<WorkerThread *, WorkerDetails>::iterator i;
 	for (i = workers.begin(); i != workers.end(); ++i) {
 	    i->first->stop();
 	}
@@ -150,7 +154,7 @@ WorkerPool::~WorkerPool()
     }
     {
 	// Cleanup exiting workers.
-	std::set<Worker *>::iterator i;
+	std::set<WorkerThread *>::iterator i;
 	for (i = exiting_workers.begin(); i != exiting_workers.end(); ++i) {
 	    (*i)->join();
 	    delete *i;
@@ -164,22 +168,14 @@ WorkerPool::~WorkerPool()
 	    exited_workers.pop();
 	}
     }
-
-    delete factory;
 }
 
 void
-WorkerPool::set_factory(WorkerFactory * factory_)
-{
-    factory = factory_;
-}
-
-void
-WorkerPool::worker_message_handled(Worker * worker, bool ready_to_exit)
+WorkerPool::worker_message_handled(WorkerThread * worker, bool ready_to_exit)
 {
     ContextLocker lock(workerlist_mutex);
 
-    std::map<Worker *, WorkerDetails>::iterator i;
+    std::map<WorkerThread *, WorkerDetails>::iterator i;
     i = workers.find(worker);
     assert(i != workers.end());
     assert(i->second.messages > 0);
@@ -190,7 +186,7 @@ WorkerPool::worker_message_handled(Worker * worker, bool ready_to_exit)
 }
 
 void
-WorkerPool::worker_exited(Worker * worker)
+WorkerPool::worker_exited(WorkerThread * worker)
 {
     ContextLocker lock(workerlist_mutex);
 
@@ -202,23 +198,14 @@ WorkerPool::worker_exited(Worker * worker)
 }
 
 void
-WorkerPool::send_to_worker(const std::string & group,
-			   int connection_num,
-			   const std::string & msg)
-{
-    ContextLocker lock(workerlist_mutex);
-    do_send_to_worker(group, connection_num, msg);
-}
-
-void
 WorkerPool::stop()
 {
     ContextLocker lock(workerlist_mutex);
 
-    logger->info("Stopping all workers");
+    logger->debug("Stopping all workers");
 
     while (!workers.empty()) {
-	Worker * worker = workers.begin()->first;
+	WorkerThread * worker = workers.begin()->first;
 	worker->stop();
 
 	if (!remove_current_worker(worker)) {
@@ -240,11 +227,11 @@ WorkerPool::join()
 {
     ContextLocker lock(workerlist_mutex);
 
-    logger->info("Joining all workers");
+    logger->debug("Joining all workers");
 
     // Cleanup exiting workers.
     while (!exiting_workers.empty()) {
-	Worker * worker = *exiting_workers.begin();
+	WorkerThread * worker = *exiting_workers.begin();
 	lock.unlock();
 	worker->join();
 	lock.lock();

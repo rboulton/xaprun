@@ -40,9 +40,16 @@
 #include <sys/types.h>
 #include "utils.h"
 #include "worker.h"
+#include "workerpool.h"
 
-Server::Server(const ServerSettings & settings)
-	: internal(new ServerInternal(settings))
+void
+Dispatcher::send_to_worker(const std::string & group, const Message & msg)
+{
+    pool->send_to_worker(group, msg);
+}
+
+Server::Server(const ServerSettings & settings, Dispatcher * dispatcher)
+	: internal(new ServerInternal(settings, dispatcher))
 {
 }
 
@@ -64,18 +71,20 @@ Server::get_error_message() const
 }
 
 
-ServerInternal::ServerInternal(const ServerSettings & settings_)
+ServerInternal::ServerInternal(const ServerSettings & settings_, Dispatcher * dispatcher_)
 	: settings(settings_),
+	  dispatcher(dispatcher_),
 	  logger(settings_.log_filename),
 	  started(false),
 	  shutting_down(false),
 	  nudge_write_end(-1),
 	  nudge_read_end(-1),
 	  error_message(),
-	  workers(&logger)
+	  workers(&logger, dispatcher_, this)
 {
+    dispatcher->pool = &workers;
+    dispatcher->logger = &logger;
     pthread_mutex_init(&outgoing_message_mutex, NULL);
-    set_worker_factory();
 }
 
 ServerInternal::~ServerInternal()
@@ -194,7 +203,7 @@ ServerInternal::mainloop()
 				  str(i->second.read_fd));
 		}
 		// Dispatch all the requests in the buffer.
-		while (dispatch_request(i->first, i->second.read_buf)) {}
+		while (dispatcher->dispatch_request(i->first, i->second.read_buf)) {}
 	    }
 	    if (FD_ISSET(i->second.write_fd, &wfds)) {
 		int written = io_write_some(i->second.write_fd, i->second.write_buf);
@@ -266,7 +275,7 @@ ServerInternal::dispatch_responses()
 	    int conn_num = outgoing_messages.front().first;
 	    std::map<int, Connection>::iterator i = connections.find(conn_num);
 	    if (i != connections.end()) {
-		logger.info("Dispatching response for connection " +
+		logger.debug("Dispatching response for connection " +
 			    str(conn_num));
 		i->second.write_buf.append(outgoing_messages.front().second);
 	    } else {

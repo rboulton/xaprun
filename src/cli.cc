@@ -29,12 +29,14 @@
 #include "settings.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include "xappy/dispatch.h"
 
 int main(int argc, char ** argv) {
     ServerSettings settings;
     int args_err = settings.parse_args(argc, argv);
     if (args_err != -1) return args_err;
-    Server server(settings);
+    XappyDispatcher dispatcher;
+    Server server(settings, &dispatcher);
     if (server.run()) return 0;
     fprintf(stderr, "%s\n", server.get_error_message().c_str());
     return 1;

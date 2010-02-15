@@ -87,8 +87,15 @@ Logger::error(const std::string & msg)
 {
     log('E', msg);
 }
+
 void
 Logger::info(const std::string & msg)
 {
     log('I', msg);
+}
+
+void
+Logger::debug(const std::string & msg)
+{
+    log('D', msg);
 }

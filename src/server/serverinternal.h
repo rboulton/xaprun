@@ -1,5 +1,5 @@
-/** @file server.h
- * @brief Implementation of a server around Xapian
+/** @file serverinternal.h
+ * @brief Server internal implementation
  */
 /*
  * Copyright (c) 2010 Richard Boulton
@@ -32,6 +32,8 @@
 #include <map>
 #include "workerpool.h"
 
+class Dispatcher;
+
 struct Connection {
     int read_fd;
     int write_fd;
@@ -50,6 +52,9 @@ struct Connection {
 class ServerInternal {
     /// The settings used by this server.
     const ServerSettings & settings;
+
+    /// The dispatcher used by this server.
+    Dispatcher * dispatcher;
 
     /// Logger to use.
     Logger logger;
@@ -107,24 +112,12 @@ class ServerInternal {
      */
     void stop_listening();
 
-    /** Pull the first request from the start of "buf", and dispatch it.
-     *
-     *  Modifies "buf" to remove the request.
-     *
-     *  @retval true if a request was found in "buf", false otherwise.
-     */
-    bool dispatch_request(int connection_num, std::string & buf);
-
-    /** Create the worker factory.
-     */
-    void set_worker_factory();
-
     /** Dispatch all responses which are ready.
      */
     bool dispatch_responses();
 
   public:
-    ServerInternal(const ServerSettings & settings_);
+    ServerInternal(const ServerSettings & settings_, Dispatcher * dispatcher_);
     ~ServerInternal();
 
     /** Start up and run the server.

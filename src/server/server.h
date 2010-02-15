@@ -1,5 +1,5 @@
 /** @file server.h
- * @brief Implementation of a server around Xapian
+ * @brief An asynchronous, worker based, server.
  */
 /*
  * Copyright (c) 2010 Richard Boulton
@@ -28,7 +28,106 @@
 
 #include "settings.h"
 
+class Logger;
 class ServerInternal;
+class WorkerPool;
+class WorkerThread;
+
+struct Message {
+    int connection_num;
+    std::string msgid;
+    std::string target;
+    std::string payload;
+    Message() {}
+    Message(int connection_num_)
+	    : connection_num(connection_num_)
+    {}
+};
+
+class Worker {
+    WorkerThread * thread;
+  protected:
+
+    /** Wait for a message to be received.
+     *
+     *  If stop() is called on the worker, this may raise a
+     *  StopWorkerException, which must be allowed to pass through the caller
+     *
+     *  @returns a message indicating the next task to do.  Interpreting this
+     *  message is entirely up to the subclass, with the exception that a
+     *  message with a negative connection number is a request for the worker
+     *  to clean up after itself - the next call to wait_for_message() after an
+     *  empty message should have the `ready_to_exit` parameter set to True.
+     *
+     *  @param ready_to_exit True if the worker has no significant work to do
+     *  before exiting.  The worker's cleanup() method will still be called
+     *  before the worker exits (except in the case of an unclean emergency
+     *  shutdown of the server).
+     */
+    Message wait_for_message(bool ready_to_exit);
+
+    /** Send a response to a connection.
+     */
+    void send_response(int connection_num, const std::string & msg);
+
+  public:
+    /** @internal
+     *
+     *  Set the thread that this worker is run in.
+     */
+    void set_thread(WorkerThread * thread_) { thread = thread_; }
+
+    /** Main method of the worker.
+     *
+     *  This should call wait_for_message() to get messages, 
+     */
+    virtual void run() = 0;
+
+    /** Cleanup the worker.
+     *
+     *  This will be called after the stop() method has been called, to give
+     *  the worker a final chance to clean up after itself.
+     *
+     *  The default implementation does nothing.
+     */
+    virtual void cleanup();
+};
+
+class Dispatcher {
+  private:
+    WorkerPool * pool;
+
+  protected:
+    Logger * logger;
+    friend class ServerInternal;
+
+    void send_to_worker(const std::string & group, const Message & msg);
+
+  public:
+    /** Pull the first request from the start of "buf", and dispatch it.
+     *
+     *  Modifies "buf" to remove the request.
+     *
+     *  @retval true if a request was found in "buf", false otherwise.
+     */
+    virtual bool dispatch_request(int connection_num, std::string & buf) = 0;
+
+    /** Get a newly allocated worker for the given group.
+     *
+     *  This may return NULL if there are already the maximum number of workers
+     *  for that group.  In this case, an attempt to make the worker will be
+     *  made again later.
+     *
+     *  @param group The group that the worker is for.
+     *  @param current_workers The number of workers currently in that group.
+     *
+     *  @retval A new worker, or NULL if worker couldn't be allocated currently.
+     */
+
+    virtual Worker * get_worker(const std::string & group,
+				int current_workers) = 0;
+};
+
 class Server {
   public:
     /** @internal Internal state.
@@ -43,7 +142,7 @@ class Server {
      *
      *  @param settings The settings for the server.
      */
-    Server(const ServerSettings & settings);
+    Server(const ServerSettings & settings, Dispatcher * dispatcher);
 
     /** Clean up any outstanding server resources.
      */
