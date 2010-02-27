@@ -40,6 +40,22 @@
 // FIXME - make this configurable.
 #define MAX_MSG_LEN_LEN 9
 
+void
+XappyDispatcher::send_error_response(int connection_num,
+				     const std::string & msg)
+{
+    send_response(connection_num, str(msg.size() + 1) + " E" + msg);
+}
+
+void
+XappyDispatcher::send_success_response(int connection_num,
+				       const std::string & msg)
+{
+    send_response(connection_num, str(msg.size() + 1) + " S" + msg);
+}
+
+
+
 Worker *
 XappyDispatcher::get_worker(const std::string & group, int current_workers)
 {
@@ -47,7 +63,6 @@ XappyDispatcher::get_worker(const std::string & group, int current_workers)
     if (group == "search") {
     	return new SearchWorker();
     }
-    return new SearchWorker();
     return NULL;
 }
 
@@ -60,11 +75,13 @@ XappyDispatcher::build_message(Message & msg,
 
     if (i >= end) {
 	logger->error("Invalid message: no target or payload");
+	send_error_response(msg.connection_num, "Invalid message");
 	return false;
     }
     size_t j = buf.find(' ', i + 1);
     if (j >= end) {
 	logger->error("Invalid message: no payload");
+	send_error_response(msg.connection_num, "Invalid message");
 	return false;
     }
 
@@ -82,10 +99,13 @@ XappyDispatcher::route_message(int connection_num,
 			       const std::string & buf, size_t pos, size_t msglen)
 {
     Message msg(connection_num);
-    if (!build_message(msg, buf, pos, msglen))
-	return;
+    if (!build_message(msg, buf, pos, msglen)) return;
 
-    send_to_worker("echo", msg);
+    if (msg.target == "version") {
+	send_success_response(VERSION);
+	return
+
+    send_to_worker("search", msg);
 }
 
 bool
@@ -119,9 +139,10 @@ XappyDispatcher::dispatch_request(int connection_num, std::string & buf)
 	if (buf[pos] != ' ') {
 	    pos = buf.find_first_of("\n\r", pos, 2);
 	    if (pos != buf.npos) {
-		logger->debug("Resyncing - skipping " + str(pos - startpos) +
+		logger->error("Resyncing - skipping " + str(pos - startpos) +
 			      " characters: \"" +
 			      buf.substr(startpos, pos - startpos) + "\"");
+		send_error_response(connection_num, "Invalid message");
 		startpos = pos;
 		continue;
 	    } else {

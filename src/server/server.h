@@ -99,9 +99,11 @@ class Dispatcher {
 
   protected:
     Logger * logger;
+    ServerInternal * server;
     friend class ServerInternal;
 
     void send_to_worker(const std::string & group, const Message & msg);
+    void send_response(int connection_num, const std::string & msg);
 
   public:
     /** Pull the first request from the start of "buf", and dispatch it.

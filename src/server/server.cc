@@ -48,6 +48,12 @@ Dispatcher::send_to_worker(const std::string & group, const Message & msg)
     pool->send_to_worker(group, msg);
 }
 
+void
+Dispatcher::send_response(int connection_num, const std::string & msg)
+{
+    server->queue_response(connection_num, msg);
+}
+
 Server::Server(const ServerSettings & settings, Dispatcher * dispatcher)
 	: internal(new ServerInternal(settings, dispatcher))
 {
@@ -82,6 +88,7 @@ ServerInternal::ServerInternal(const ServerSettings & settings_, Dispatcher * di
 	  error_message(),
 	  workers(&logger, dispatcher_, this)
 {
+    dispatcher->server = this;
     dispatcher->pool = &workers;
     dispatcher->logger = &logger;
     pthread_mutex_init(&outgoing_message_mutex, NULL);
