@@ -115,11 +115,11 @@ bool io_read_exact(std::string & result, int fd, size_t to_read);
  *  @param fd The file descriptor to read from.
  *  @param max_to_read The maxium number of bytes to read.
  *
- *  @returns true if read without error (though possibly having been unable
- *  to read all bytes requested due to EOF), false otherwise.  Errno will be
- *  set if false is returned.
+ *  @return the numebr of bytes read if read without error (possibly 0 if
+ *  having been unable to read all bytes requested due to EOF), or -1 on error.
+ *  Errno will be set if -1 is returned.
  */
-bool io_read_append(std::string & result, int fd, size_t max_to_read);
+int io_read_append(std::string & result, int fd, size_t max_to_read);
 
 /** Read some bytes, and append to a string.
  *

@@ -112,7 +112,7 @@ io_read_exact(std::string & result, int fd, size_t to_read)
     return true;
 }
 
-bool
+int
 io_read_append(std::string & result, int fd, size_t max_to_read)
 {
     while (true) {
@@ -120,12 +120,12 @@ io_read_append(std::string & result, int fd, size_t max_to_read)
 	ssize_t bytes_read = read(fd, buf, max_to_read);
 
 	if (bytes_read == 0) {
-	    return true;
+	    return bytes_read;
 	} else if (bytes_read > 0) {
 	    result.append(buf, bytes_read);
-	    return true;
+	    return bytes_read;
 	} else {
-	    if (errno != EINTR) return false;
+	    if (errno != EINTR) return -1;
 	}
     }
 }
