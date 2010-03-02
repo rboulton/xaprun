@@ -65,7 +65,7 @@ Logger::log(char type, const std::string & msg)
 
     std::string line(1, type);
     line.append(str(getpid()));
-    line.append(".", 2);
+    line.append(".", 1);
     line.append(str(pthread_self()));
     line.append(": ", 2);
     line.append(msg);
