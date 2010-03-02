@@ -149,7 +149,7 @@ ServerInternal::run()
 void
 ServerInternal::mainloop()
 {
-    while (true) {
+    while (!connections.empty()) {
 	int maxfd = 0;
 	fd_set rfds;
 	fd_set wfds;
@@ -202,25 +202,45 @@ ServerInternal::mainloop()
 	}
 
 	// Check each connection's file descriptors.
+	std::set<int> closed_connections;
 	for (i = connections.begin(); i != connections.end(); ++i) {
 	    if (FD_ISSET(i->second.read_fd, &rfds)) {
-		if (!io_read_append(i->second.read_buf,
-				    i->second.read_fd, 65536)) {
+		int bytes_read = io_read_append(i->second.read_buf,
+						i->second.read_fd, 65536);
+		if (bytes_read < 0) {
 		    logger.syserr("Failed to read from fd " +
-				  str(i->second.read_fd));
+				  str(i->second.read_fd) +
+				  " for connection " +
+				  str(i->first));
+		} else if (bytes_read == 0) {
+		    logger.info("Connection " + str(i->first) + " closed");
+		    closed_connections.insert(i->first);
+		} else {
+		    // Dispatch all the requests in the buffer.
+		    while (dispatcher->dispatch_request(i->first,
+							i->second.read_buf)) {}
 		}
-		// Dispatch all the requests in the buffer.
-		while (dispatcher->dispatch_request(i->first, i->second.read_buf)) {}
 	    }
 	    if (FD_ISSET(i->second.write_fd, &wfds)) {
 		int written = io_write_some(i->second.write_fd, i->second.write_buf);
 		if (written <= 0) {
 		    logger.syserr("Failed to write to fd " +
-				  str(i->second.write_fd));
+				  str(i->second.write_fd) +
+				  " for connection " +
+				  str(i->first));
+		    closed_connections.insert(i->first);
 		} else {
 		    assert((size_t)written <= i->second.write_buf.size());
 		    i->second.write_buf.erase(0, written);
 		}
+	    }
+	}
+	std::set<int>::iterator j;
+	for (j = closed_connections.begin();
+	     j != closed_connections.end(); ++j) {
+	    i = connections.find(*j);
+	    if (i != connections.end()) {
+		connections.erase(i);
 	    }
 	}
     }
