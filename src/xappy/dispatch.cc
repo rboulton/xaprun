@@ -54,8 +54,6 @@ XappyDispatcher::send_success_response(int connection_num,
     send_response(connection_num, str(msg.size() + 1) + " S" + msg);
 }
 
-
-
 Worker *
 XappyDispatcher::get_worker(const std::string & group, int current_workers)
 {
@@ -101,11 +99,40 @@ XappyDispatcher::route_message(int connection_num,
     Message msg(connection_num);
     if (!build_message(msg, buf, pos, msglen)) return;
 
-    if (msg.target == "version") {
-	send_success_response(VERSION);
-	return
+    if (msg.target.empty()) {
+	logger->error("Invalid message: empty target");
+	send_error_response(msg.connection_num, "Invalid message");
+	return;
+    }
+    std::string target = msg.target.substr(1);
+    switch (msg.target[0]) {
+	case 'G': // GET
+	    {
+		if (target == "version") {
+		    send_success_response(connection_num, VERSION);
+		    return;
+		}
 
-    send_to_worker("search", msg);
+		send_to_worker("search", msg);
+	    }
+	    break;
+	case 'P': // POST
+	    {
+	    }
+	    break;
+	case 'U': // PUT
+	    {
+	    }
+	    break;
+	case 'D': // DELETE
+	    {
+	    }
+	    break;
+	default:
+	    logger->error(std::string("Unknown message type: '") + msg.target[0] + "'");
+	    send_error_response(msg.connection_num, "Invalid message");
+	    return;
+    }
 }
 
 bool
