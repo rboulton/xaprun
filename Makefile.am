@@ -7,7 +7,10 @@ LIBTOOL = @LIBTOOL@ $(QUIET:y=--quiet)
 AUTOMAKE_OPTIONS = 1.5 subdir-objects
 ACLOCAL_AMFLAGS = -I m4
 
-INCLUDES = -I$(top_srcdir)/ext -I$(top_srcdir)/src
+INCLUDES = \
+	-I$(top_srcdir)/ext \
+	-I$(top_srcdir)/libs/http-parser \
+	-I$(top_srcdir)/src
 
 AM_CPPFLAGS = -DCONFIGFILE_SYSTEM=\"$(sysconfdir)/xappy.conf\"
 AM_CXXFLAGS += $(XAPIAN_CXXFLAGS)
@@ -18,6 +21,7 @@ dist_sysconf_DATA = xappy.conf
 
 noinst_HEADERS = \
 	ext/str.h \
+	libs/http-parser/http_parser.h \
 	src/server/io_wrappers.h \
 	src/server/logger.h \
 	src/server/server.h \
@@ -33,6 +37,7 @@ AM_LDFLAGS =
 
 xappy_server_SOURCES = \
 	ext/str.cc \
+	libs/http-parser/http_parser.cc \
 	src/server/io_wrappers.cc \
 	src/server/logger.cc \
 	src/server/server.cc \
