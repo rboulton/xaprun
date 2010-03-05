@@ -74,7 +74,7 @@ do {                                                                 \
 #define CALLBACK(FOR)                                                \
 do {                                                                 \
   CALLBACK_NOCLEAR(FOR);                                             \
-  parser->FOR##_mark = NULL;                                         \
+  parser->FOR##_mark = (const char *)(NULL);                         \
 } while (0)
 
 
@@ -1497,11 +1497,11 @@ http_parser_init (http_parser *parser, enum http_parser_type t)
   parser->state = (t == HTTP_REQUEST ? s_start_req : s_start_res);
   parser->nread = 0;
 
-  parser->header_field_mark = NULL;
-  parser->header_value_mark = NULL;
-  parser->query_string_mark = NULL;
-  parser->path_mark = NULL;
-  parser->url_mark = NULL;
-  parser->fragment_mark = NULL;
+  parser->header_field_mark = (const char *)NULL;
+  parser->header_value_mark = (const char *)NULL;
+  parser->query_string_mark = (const char *)NULL;
+  parser->path_mark = (const char *)NULL;
+  parser->url_mark = (const char *)NULL;
+  parser->fragment_mark = (const char *)NULL;
 }
 
