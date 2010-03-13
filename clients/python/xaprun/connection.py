@@ -21,16 +21,18 @@
 
 """
 
-import config
 import os
 import select
 import subprocess
 import time
 
-class ConnectionError(Exception):
-    """Base class of all errors associated with a connection.
+try:
+    import simplejson as json
+except:
+    import json
 
-    """
+from config import xaprun_path
+from errors import ConnectionError
 
 class Connection(object):
     GET = 'G'
@@ -57,6 +59,26 @@ class Connection(object):
 
     def __del__(self):
         self.close()
+
+    def sendwait(self, method, target, payload, timeout=None):
+        """Send a message, wait for a result, and return it.
+
+        The method should be one of Connection.GET, Connection.POST,
+        Connection.PUT or Connection.DELETE.
+
+        The target should be url quoted (eg, with urllib.quote), and must not
+        contain any spaces.
+
+        Timeout is the number of seconds to wait, or None to wait indefinitely
+        for the response.
+
+        """
+        r = []
+        def cb(result):
+            r.append(result)
+        self.send(method, target, payload, cb)
+        self.check(timeout)
+        return r[0]
 
     def send(self, method, target, payload, callback):
         """Send a message.
@@ -91,13 +113,16 @@ class Connection(object):
         `timeout` is the time to wait for responses, in seconds.
 
         """
-        endtime = time.time() + timeout
+        if timeout is None:
+            endtime = None
+        else:
+            endtime = time.time() + timeout
         looped = False
         need_more_data = False
         while True:
             if looped:
                 # Check the timeout on subsequent passes round the loop
-                if time.time() >= endtime:
+                if endtime is not None and time.time() >= endtime:
                     return
             else:
                 looped = True
@@ -150,8 +175,8 @@ class Connection(object):
         buf = buf[i + 1:]
         cb = self.pending.get(msgid, None)
         if cb is None:
-            print msgid, self.pending
-            raise ConnectionError("Response for unknown message id")
+            raise ConnectionError("Response for unknown message id (%r)" %
+                                  msgid)
         del self.pending[msgid]
         try:
             response = ''
@@ -165,7 +190,7 @@ class Connection(object):
                         'msg': "Unknown response type code (%r)" % buf[0]}
             cb(response)
         except:
-            cb()
+            cb({'ok': 0, 'msg': 'Unable to parse response'})
 
     def close(self):
         """Close the connection to the server.
@@ -195,7 +220,8 @@ class Connection(object):
         reached.  It returns the bytes read (an empty string if no bytes were
         read).
 
-        `endtime` is the time to return at, if no responses were returned.
+        `endtime` is the time to return at, if no responses were returned.  If
+        None, _read shouldn't return until a response is returned.
 
         """
         raise NotImplementedError
@@ -206,7 +232,7 @@ class Connection(object):
 class LocalConnection(Connection):
     def __init__(self):
         Connection.__init__(self)
-        cmd = [config.xaprun_path, '--stdio']
+        cmd = [xaprun_path, '--stdio']
         try:
             self.process = subprocess.Popen(cmd,
                                             bufsize=0,
@@ -231,9 +257,12 @@ class LocalConnection(Connection):
         os.write(self.write_fd, data)
 
     def _read(self, maxbytes, endtime):
-        timeout = endtime - time.time()
-        if timeout < 0:
-            timeout = 0
+        if endtime is None:
+            timeout = None
+        else:
+            timeout = endtime - time.time()
+            if timeout < 0:
+                timeout = 0
         ready_rfds = select.select([self.read_fd], [], [], timeout)[0]
         if ready_rfds == [self.read_fd]:
             return os.read(self.read_fd, maxbytes)

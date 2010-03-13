@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 
-import xappyclient
+import xaprun
+import unittest
 
 def test():
-    c = xappyclient.LocalConnection()
+    c = xaprun.LocalConnection()
     def cb(result):
         print repr(result)
     c.send(c.GET, 'version', '', cb)
     c.send(c.GET, 'version', '', cb)
-    c.check(1.0)
     c.check(1.0)
     c.check(1.0)
 

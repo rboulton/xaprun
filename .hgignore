@@ -18,3 +18,5 @@ m4/lt~obsolete.m4
 m4/xapian-1.1.m4
 missing
 build.*
+.*.pyc
+.*.pyo

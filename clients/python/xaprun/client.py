@@ -17,9 +17,43 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 # IN THE SOFTWARE.
-"""xappyclient: A client for xaprun.
+"""client.py: Client for xaprun
 
 """
 
-from connection import Connection, LocalConnection
-from client import Client
+import connection
+from errors import ConnectionError
+
+def check(response):
+    """Check that a response is a dict, and has 'ok': 0.
+
+    Raise an exception if not.
+
+    """
+    if not isinstance(response, dict):
+        raise ConnectionError("Response is not a dict")
+    if response.get('ok', 0) != 1:
+        msg = response.get('msg', 'Unspecified error in server')
+        raise ConnectionError(msg)
+    return response
+
+def item_from_response(response, key):
+    """Get a single item from a response.
+
+    """
+    response = check(response)
+    try:
+        return response[key]
+    except KeyError:
+        raise ConnectionError("Expected key '%s' missing from response" % key)
+
+class Client(object):
+    def __init__(self, conn=None):
+        if conn is None:
+            conn = connection.LocalConnection()
+        self.conn = conn
+
+    def version(self, timeout=None):
+        r = self.conn.sendwait(self.conn.GET, 'version', '', timeout)
+        return item_from_response(r, 'msg')
+        
