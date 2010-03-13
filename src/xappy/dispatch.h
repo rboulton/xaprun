@@ -34,7 +34,8 @@ class XappyDispatcher : public Dispatcher {
     Worker * get_worker(const std::string & group, int current_workers);
 
     void send_error_response(int connection_num, const std::string & msg);
-    void send_success_response(int connection_num, const std::string & msg);
+    void send_msg_response(int connection_num, const std::string & msgid,
+			   char status, const std::string & msg);
 
     bool build_message(Message & msg,
 		  const std::string & buf, size_t pos, size_t msglen);

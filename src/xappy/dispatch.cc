@@ -48,10 +48,18 @@ XappyDispatcher::send_error_response(int connection_num,
 }
 
 void
-XappyDispatcher::send_success_response(int connection_num,
-				       const std::string & msg)
+XappyDispatcher::send_msg_response(int connection_num,
+				   const std::string & msgid,
+				   char status,
+				   const std::string & msg)
 {
-    send_response(connection_num, str(msg.size() + 1) + " S" + msg);
+    logger->error(std::string("Sending response to msgid: '") + msgid + "'");
+    std::string buf(" ");
+    buf += msgid;
+    buf += " ";
+    buf += status;
+    buf += msg;
+    send_response(connection_num, str(buf.size() - 1) + buf);
 }
 
 Worker *
@@ -109,7 +117,7 @@ XappyDispatcher::route_message(int connection_num,
 	case 'G': // GET
 	    {
 		if (target == "version") {
-		    send_success_response(connection_num, VERSION);
+		    send_msg_response(connection_num, msg.msgid, 'S', VERSION);
 		    return;
 		}
 
