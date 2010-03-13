@@ -12,12 +12,12 @@ INCLUDES = \
 	-I$(top_srcdir)/libs/http-parser \
 	-I$(top_srcdir)/src
 
-AM_CPPFLAGS = -DCONFIGFILE_SYSTEM=\"$(sysconfdir)/xappy.conf\"
+AM_CPPFLAGS = -DCONFIGFILE_SYSTEM=\"$(sysconfdir)/xaprun.conf\"
 AM_CXXFLAGS += $(XAPIAN_CXXFLAGS)
 
-bin_PROGRAMS = xappy-server
+bin_PROGRAMS = xaprun
 
-dist_sysconf_DATA = xappy.conf
+dist_sysconf_DATA = xaprun.conf
 
 noinst_HEADERS = \
 	ext/str.h \
@@ -35,7 +35,7 @@ noinst_HEADERS = \
 
 AM_LDFLAGS =
 
-xappy_server_SOURCES = \
+xaprun_SOURCES = \
 	ext/str.cc \
 	libs/http-parser/http_parser.cc \
 	src/server/io_wrappers.cc \
@@ -50,7 +50,7 @@ xappy_server_SOURCES = \
 	src/settings.cc \
 	src/utils.cc
 
-xappy_server_LDADD = $(XAPIAN_LIBS)
-xappy_server_LDFLAGS = -pthread
+xaprun_LDADD = $(XAPIAN_LIBS)
+xaprun_LDFLAGS = -pthread
 
 DISTCHECK_CONFIGURE_FLAGS = "XAPIAN_CONFIG=$(XAPIAN_CONFIG)"

@@ -17,10 +17,11 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 # IN THE SOFTWARE.
-"""connection.py: A connection to xappy-server.
+"""connection.py: A connection to xaprun.
 
 """
 
+import config
 import os
 import select
 import subprocess
@@ -205,7 +206,7 @@ class Connection(object):
 class LocalConnection(Connection):
     def __init__(self):
         Connection.__init__(self)
-        cmd = ['./xappy-server', '--stdio']
+        cmd = [config.xaprun_path, '--stdio']
         try:
             self.process = subprocess.Popen(cmd,
                                             bufsize=0,
@@ -214,7 +215,7 @@ class LocalConnection(Connection):
                                             close_fds=True)
         except OSError, e:
             raise ConnectionError("Couldn't start local instance of "
-                                  "xappy-server: %s" % str(e))
+                                  "xaprun: %s" % str(e))
         self.write_fd = self.process.stdin.fileno()
         self.read_fd = self.process.stdout.fileno()
 

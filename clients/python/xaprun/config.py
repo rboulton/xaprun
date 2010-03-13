@@ -17,8 +17,8 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 # IN THE SOFTWARE.
-"""xappyclient: A client for xappy-server.
+"""config.py: System configuration for xaprun
 
 """
 
-from connection import Connection, LocalConnection
+xaprun_path = './xaprun'
