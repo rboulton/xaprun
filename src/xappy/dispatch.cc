@@ -33,6 +33,7 @@
 #include "server/workerpool.h"
 #include "str.h"
 #include "xappy/searchworker.h"
+#include "json/json.h"
 
 // Maximum length of a message length.  9 = 10^9 bytes, and since we pull the
 // whole message into memory to deal with it, we almost certainly don't want to
@@ -41,24 +42,40 @@
 #define MAX_MSG_LEN_LEN 9
 
 void
-XappyDispatcher::send_error_response(int connection_num,
-				     const std::string & msg)
+XappyDispatcher::send_fatal_error(int connection_num,
+				  const std::string & payload)
 {
-    send_response(connection_num, str(msg.size() + 1) + " E" + msg);
+    Json::FastWriter writer;
+    Json::Value root;
+    root[Json::StaticString("ok")] = 0;
+    root[Json::StaticString("msg")] = payload;
+    send_response(connection_num, str(payload.size() + 1) + " F" + writer.write(root));
+    // FIXME - close the connection after sending this response.
+}
+
+void
+XappyDispatcher::send_error_response(const Message & msg,
+				     const std::string & payload)
+{
+    Json::FastWriter writer;
+    Json::Value root;
+    root[Json::StaticString("ok")] = 0;
+    root[Json::StaticString("msg")] = payload;
+    send_msg_response(msg.connection_num, msg.msgid, 'E', writer.write(root));
 }
 
 void
 XappyDispatcher::send_msg_response(int connection_num,
 				   const std::string & msgid,
 				   char status,
-				   const std::string & msg)
+				   const std::string & payload)
 {
     logger->error(std::string("Sending response to msgid: '") + msgid + "'");
     std::string buf(" ");
     buf += msgid;
     buf += " ";
     buf += status;
-    buf += msg;
+    buf += payload;
     send_response(connection_num, str(buf.size() - 1) + buf);
 }
 
@@ -81,13 +98,13 @@ XappyDispatcher::build_message(Message & msg,
 
     if (i >= end) {
 	logger->error("Invalid message: no target or payload");
-	send_error_response(msg.connection_num, "Invalid message");
+	send_fatal_error(msg.connection_num, "Invalid message");
 	return false;
     }
     size_t j = buf.find(' ', i + 1);
     if (j >= end) {
 	logger->error("Invalid message: no payload");
-	send_error_response(msg.connection_num, "Invalid message");
+	send_fatal_error(msg.connection_num, "Invalid message");
 	return false;
     }
 
@@ -109,7 +126,7 @@ XappyDispatcher::route_message(int connection_num,
 
     if (msg.target.empty()) {
 	logger->error("Invalid message: empty target");
-	send_error_response(msg.connection_num, "Invalid message");
+	send_error_response(msg, "Invalid message");
 	return;
     }
     std::string target = msg.target.substr(1);
@@ -122,6 +139,7 @@ XappyDispatcher::route_message(int connection_num,
 		}
 
 		send_to_worker("search", msg);
+		return;
 	    }
 	    break;
 	case 'P': // POST
@@ -138,9 +156,10 @@ XappyDispatcher::route_message(int connection_num,
 	    break;
 	default:
 	    logger->error(std::string("Unknown message type: '") + msg.target[0] + "'");
-	    send_error_response(msg.connection_num, "Invalid message");
+	    send_error_response(msg, "Invalid message");
 	    return;
     }
+    send_error_response(msg, "Not found");
 }
 
 bool
@@ -177,7 +196,7 @@ XappyDispatcher::dispatch_request(int connection_num, std::string & buf)
 		logger->error("Resyncing - skipping " + str(pos - startpos) +
 			      " characters: \"" +
 			      buf.substr(startpos, pos - startpos) + "\"");
-		send_error_response(connection_num, "Invalid message");
+		send_fatal_error(connection_num, "Invalid message");
 		startpos = pos;
 		continue;
 	    } else {

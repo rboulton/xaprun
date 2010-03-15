@@ -33,12 +33,20 @@ class XappyDispatcher : public Dispatcher {
     bool dispatch_request(int connection_num, std::string & buf);
     Worker * get_worker(const std::string & group, int current_workers);
 
-    void send_error_response(int connection_num, const std::string & msg);
+    /** Send a response indicating a protocol error.
+     *
+     *  The connection will be closed after the response has been sent.
+     */
+    void send_fatal_error(int connection_num, const std::string & payload);
+
+    /** Send an error message.
+     */
+    void send_error_response(const Message & msg, const std::string & payload);
     void send_msg_response(int connection_num, const std::string & msgid,
-			   char status, const std::string & msg);
+			   char status, const std::string & payload);
 
     bool build_message(Message & msg,
-		  const std::string & buf, size_t pos, size_t msglen);
+		       const std::string & buf, size_t pos, size_t msglen);
     void route_message(int connection_num,
 		       const std::string & buf, size_t pos, size_t msglen);
 };
