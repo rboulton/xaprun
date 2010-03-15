@@ -191,19 +191,24 @@ class Connection(object):
             raise ConnectionError("Response for unknown message id (%r)" %
                                   msgid)
         del self.pending[msgid]
+        response = ''
         try:
-            response = ''
             if len(buf) > 0:
                 if buf[0] == 'S':
                     response = {'ok': 1, 'msg': buf[1:]}
                 elif buf[0] == 'J':
                     response = json.loads(buf[1:])
+                elif buf[0] == 'E':
+                    response = json.loads(buf[1:])
+                elif buf[0] == 'F':
+                    response = json.loads(buf[1:])
                 else:
                     response = {'ok': 0,
                         'msg': "Unknown response type code (%r)" % buf[0]}
-            cb(response)
         except:
-            cb({'ok': 0, 'msg': 'Unable to parse response'})
+            cb({'ok': 0, 'msg': 'Unable to parse response (%r)' % buf})
+        else:
+            cb(response)
 
     def close(self):
         """Close the connection to the server.
