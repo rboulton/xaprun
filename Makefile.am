@@ -13,6 +13,7 @@ INCLUDES = \
 	-I$(top_srcdir)/ext \
 	-I$(top_srcdir)/libs/http-parser \
 	-I$(top_srcdir)/libs/re2/include \
+	-I$(top_srcdir)/libs/jsoncpp/include \
 	-I$(top_srcdir)/src
 
 AM_CPPFLAGS = -DCONFIGFILE_SYSTEM=\"$(sysconfdir)/xaprun.conf\"
@@ -49,7 +50,7 @@ xaprun_SOURCES = \
 	src/settings.cc \
 	src/utils.cc
 
-xaprun_LDADD = $(XAPIAN_LIBS)
+xaprun_LDADD = $(XAPIAN_LIBS) libs/libxaprunlibs.a
 xaprun_LDFLAGS = -pthread
 
 DISTCHECK_CONFIGURE_FLAGS = "XAPIAN_CONFIG=$(XAPIAN_CONFIG)"
