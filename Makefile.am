@@ -7,9 +7,12 @@ LIBTOOL = @LIBTOOL@ $(QUIET:y=--quiet)
 AUTOMAKE_OPTIONS = 1.5 subdir-objects
 ACLOCAL_AMFLAGS = -I m4
 
+SUBDIRS = libs .
+
 INCLUDES = \
 	-I$(top_srcdir)/ext \
 	-I$(top_srcdir)/libs/http-parser \
+	-I$(top_srcdir)/libs/re2/include \
 	-I$(top_srcdir)/src
 
 AM_CPPFLAGS = -DCONFIGFILE_SYSTEM=\"$(sysconfdir)/xaprun.conf\"
@@ -21,7 +24,6 @@ dist_sysconf_DATA = xaprun.conf
 
 noinst_HEADERS = \
 	ext/str.h \
-	libs/http-parser/http_parser.h \
 	src/server/io_wrappers.h \
 	src/server/logger.h \
 	src/server/server.h \
@@ -33,11 +35,8 @@ noinst_HEADERS = \
 	src/settings.h \
 	src/utils.h
 
-AM_LDFLAGS =
-
 xaprun_SOURCES = \
 	ext/str.cc \
-	libs/http-parser/http_parser.cc \
 	src/server/io_wrappers.cc \
 	src/server/logger.cc \
 	src/server/server.cc \

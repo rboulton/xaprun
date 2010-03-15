@@ -12,6 +12,7 @@ LT_INIT
 
 dnl Checks for programs.
 AC_PROG_CXX
+AC_PROG_CC
 AM_PROG_CC_C_O
 
 dnl Run tests using the C++ compiler.
@@ -247,5 +248,5 @@ dnl **************************
 dnl * Build the output files *
 dnl **************************
 
-AC_CONFIG_FILES([Makefile])
+AC_CONFIG_FILES([Makefile libs/Makefile])
 AC_OUTPUT
