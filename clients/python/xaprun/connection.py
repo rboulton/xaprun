@@ -25,22 +25,29 @@ import os
 import select
 import subprocess
 import time
+import threading
 
-try:
-    import simplejson as json
-except:
-    import json
+from utils import json, locked
 
 from config import xaprun_path
 from errors import ConnectionError
 
 class Connection(object):
+    """A connector
+
+    All public methods in this class (ie, all whose names don't begin with _)
+    are safe to call concurrently.
+
+    """
     GET = 'G'
     POST = 'P'
     PUT = 'U'
     DELETE = 'D'
 
     def __init__(self):
+        # Lock to be held whenever accessing the connection.
+        self.lock = threading.Lock()
+
         # IDs of messages we're waiting for a response from.
         self.pending = {}
 
@@ -77,9 +84,12 @@ class Connection(object):
         def cb(result):
             r.append(result)
         self.send(method, target, payload, cb)
-        self.check(timeout)
-        return r[0]
+        while True:
+            self.check(timeout)
+            if len(r) != 0:
+                return r[0]
 
+    @locked
     def send(self, method, target, payload, callback):
         """Send a message.
 
@@ -88,6 +98,8 @@ class Connection(object):
 
         The target should be url quoted (eg, with urllib.quote), and must not
         contain any spaces.
+
+        This method may block while waiting for data to be sent to the server.
 
         """
         if self.closed:
@@ -101,6 +113,7 @@ class Connection(object):
         self.next_id += 1
         self._write(str(len(msg)) + " " + msg)
 
+    @locked
     def check(self, timeout=0.0):
         """Check for a response from the server.
 
