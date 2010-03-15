@@ -55,6 +55,10 @@ def quote(val):
     """
     return urllib.quote(val, safe='')
 
+jsonseps = (',', ':')
+def jsondumps(obj):
+    return json.dumps(obj, separators=jsonseps)
+
 class Client(object):
     def __init__(self, conn=None, timeout=None):
         """Create a client.
@@ -78,9 +82,16 @@ class Client(object):
         return check(self.conn.sendwait(self.conn.PUT, target, payload,
                                         self.timeout))
 
+    def _putj(self, target, payload):
+        payload = jsondumps(payload)
+        return self._put(target, jsondumps(payload))
+
     def _post(self, target, payload):
         return check(self.conn.sendwait(self.conn.POST, target, payload,
                                         self.timeout))
+
+    def _postj(self, target, payload):
+        return self._post(target, jsondumps(payload))
 
     def _delete(self, target):
         return check(self.conn.sendwait(self.conn.DELETE, target, '',
@@ -109,8 +120,7 @@ class Database(object):
         return Schema(item_from_response(r, 'schema'))
 
     def set_schema(self, schema):
-        r = self.client._put(self.qname + "/_schema",
-                             json.dumps(schema.schema))
+        r = self.client._putj(self.qname + "/_schema", schema.schema)
 
     def insert(self, doc, docid='', type="default"):
         """Insert a document.
@@ -126,10 +136,10 @@ class Database(object):
         """
         if docid:
             target = self.qname + '/' + quote(type) + '/'
-            r = self.client._post(target, doc)
+            r = self.client._postj(target, doc)
         else:
             target = self.qname + '/' + quote(type) + '/' + docid
-            r = self.client._put(target, doc)
+            r = self.client._putj(target, doc)
         return item_from_response(r, 'docid')
 
     def delete(self, docid, type="default"):
