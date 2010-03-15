@@ -23,6 +23,8 @@
 
 import connection
 from errors import ConnectionError
+import urllib
+from utils import json
 
 def check(response):
     """Check that a response is a dict, and has 'ok': 0.
@@ -47,13 +49,122 @@ def item_from_response(response, key):
     except KeyError:
         raise ConnectionError("Expected key '%s' missing from response" % key)
 
+def quote(val):
+    """Percent-quote a value, using no special safe characters.
+
+    """
+    return urllib.quote(val, safe='')
+
 class Client(object):
-    def __init__(self, conn=None):
+    def __init__(self, conn=None, timeout=None):
+        """Create a client.
+
+        - `conn` must be a valid connection to xaprun.
+
+        - `timeout` is the timeout, in seconds, used for all accesses to
+          xaprun.  This may be set to None to wait indefinitely.
+
+        """
         if conn is None:
             conn = connection.LocalConnection()
         self.conn = conn
+        self.timeout = timeout
 
-    def version(self, timeout=None):
-        r = self.conn.sendwait(self.conn.GET, 'version', '', timeout)
+    def _get(self, target):
+        return check(self.conn.sendwait(self.conn.GET, target, '',
+                                        self.timeout))
+
+    def _put(self, target, payload):
+        return check(self.conn.sendwait(self.conn.PUT, target, payload,
+                                        self.timeout))
+
+    def _post(self, target, payload):
+        return check(self.conn.sendwait(self.conn.POST, target, payload,
+                                        self.timeout))
+
+    def _delete(self, target):
+        return check(self.conn.sendwait(self.conn.DELETE, target, '',
+                                        self.timeout))
+
+    def version(self):
+        r = self._get('version')
         return item_from_response(r, 'msg')
-        
+
+    def db(self, dbname):
+        return Database(self, dbname)
+
+class Database(object):
+    def __init__(self, client, name):
+        self.client = client
+        self.name = name
+        self.qname = quote(name)
+
+    def get_schema(self):
+        """Get the current schema of the database.
+
+        Returns a Schema object.
+
+        """
+        r = self.client._get(self.qname + "/_schema")
+        return Schema(item_from_response(r, 'schema'))
+
+    def set_schema(self, schema):
+        r = self.client._put(self.qname + "/_schema",
+                             json.dumps(schema.schema))
+
+    def insert(self, doc, docid='', type="default"):
+        """Insert a document.
+
+        If the docid is supplied, any existing document with the same docid
+        will be replaced by the document.
+
+        Returns the document id.
+
+        Note that documents may take some time to become visible after this
+        call.
+
+        """
+        if docid:
+            target = self.qname + '/' + quote(type) + '/'
+            r = self.client._post(target, doc)
+        else:
+            target = self.qname + '/' + quote(type) + '/' + docid
+            r = self.client._put(target, doc)
+        return item_from_response(r, 'docid')
+
+    def delete(self, docid, type="default"):
+        """Delete a document.
+
+        If the document didn't exist, this has no effect, and does not return
+        an error.
+
+        Returns None.
+
+        """
+        target = self.qname + '/' + quote(type) + '/' + docid
+        check(self.client._delete(target))
+
+    def get(self, docid):
+        """Get the document with the specified docid.
+
+        If no such document is found, returns an empty document body.
+
+        """
+        target = self.qname + '/' + quote(type) + '/' + docid
+        return item_from_response(self.client._get(target), 'doc')
+
+class Schema(object):
+    def __init__(self, schema):
+        """Initialise from a dict of schema properties.
+
+        """
+        self.schema = schema
+
+    def set_default_handler(self, action='text'):
+        """Set the handler to use on a field with no configuration.
+
+        """
+        self.schema['default_action'] = action
+
+    def get_default_handler(self):
+        return self.schema['default_action']
