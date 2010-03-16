@@ -23,6 +23,7 @@
 
 import connection
 from errors import ConnectionError
+import threading
 import urllib
 from utils import json
 
@@ -59,18 +60,34 @@ jsonseps = (',', ':')
 def jsondumps(obj):
     return json.dumps(obj, separators=jsonseps)
 
+# global used to hold the default connection.
+g_def_connection = None
+
+# Lock to be held when trying to obtain the default connection.
+g_def_connection_mutex = threading.Lock()
+
 class Client(object):
     def __init__(self, conn=None, timeout=None):
         """Create a client.
 
-        - `conn` must be a valid connection to xaprun.
+        - `conn` must be a valid connection to xaprun, or None to use a
+          connection to a xaprun instance spawned as a subprocess (the same
+          subprocess will be shared between all clients).
 
         - `timeout` is the timeout, in seconds, used for all accesses to
           xaprun.  This may be set to None to wait indefinitely.
 
         """
         if conn is None:
-            conn = connection.LocalConnection()
+            global g_def_connection_mutex
+            g_def_connection_mutex.acquire()
+            try:
+                global g_def_connection
+                if g_def_connection is None:
+                    g_def_connection = connection.LocalConnection()
+                conn = g_def_connection
+            finally:
+                g_def_connection_mutex.release()
         self.conn = conn
         self.timeout = timeout
 
@@ -108,7 +125,7 @@ class Database(object):
     def __init__(self, client, name):
         self.client = client
         self.name = name
-        self.qname = quote(name)
+        self.qname = 'db/' + quote(name)
 
     def get_schema(self):
         """Get the current schema of the database.
