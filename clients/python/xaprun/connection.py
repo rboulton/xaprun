@@ -61,7 +61,7 @@ class Connection(object):
         # of the message we're currently reading.
         self.read_msg_len = None
 
-        # Subclasses set this to True when closed.
+        # This is set this to True when closed.
         self.closed = False
 
     def __del__(self):
