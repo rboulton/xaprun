@@ -8,7 +8,7 @@ then
 fi
 
 xapmacropath=`cat $xapconfig | sed -n '/^prefix="/p' | sed 's/prefix=/-I /;s/"//g'`
-if [ "x$xapmacropath" == "x" ];
+if [ "x$xapmacropath" != "x" ];
 then
     xapmacropath="$xapmacropath/share/aclocal";
 fi
