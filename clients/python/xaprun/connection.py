@@ -143,9 +143,7 @@ class Connection(object):
             if need_more_data:
                 new_data = self._read(1024, endtime)
                 if new_data is None:
-                    self._close()
-                    self._cleanup()
-                    raise ConnectionError("Connection closed unexpectedly")
+                    self._failed("Connection closed unexpectedly")
                 self.read_buf += new_data
                 need_more_data = False
 
@@ -174,7 +172,7 @@ class Connection(object):
                 try:
                     self.read_msg_len = int(self.read_buf[:i])
                 except ValueError:
-                    raise ConnectionError("Invalid value read")
+                    self._failed("Invalid value read")
                 self.read_buf = self.read_buf[i + 1:]
 
             if len(self.read_buf) >= self.read_msg_len:
@@ -188,13 +186,12 @@ class Connection(object):
     def _handle_message(self, buf):
         i = buf.find(' ')
         if i == -1:
-            raise ConnectionError("Invalid response message - no message id")
+            self._failed("Invalid response message - no message id")
         msgid = buf[:i]
         buf = buf[i + 1:]
         cb = self.pending.get(msgid, None)
         if cb is None:
-            raise ConnectionError("Response for unknown message id (%r)" %
-                                  msgid)
+            self._failed("Response for unknown message id (%r)" % msgid)
         del self.pending[msgid]
         response = ''
         try:
@@ -214,6 +211,14 @@ class Connection(object):
             cb({'ok': 0, 'msg': 'Unable to parse response (%r)' % buf})
         else:
             cb(response)
+
+    def _failed(self, msg):
+        """Called when a connection has failed.
+
+        """
+        self._close()
+        self._cleanup()
+        raise ConnectionError(msg)
 
     @locked
     def close(self):
