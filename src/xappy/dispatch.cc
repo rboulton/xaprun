@@ -28,17 +28,18 @@
 
 #include <algorithm>
 #include <ctype.h>
+#include "json/json.h"
 #include "server/serverinternal.h"
 #include "server/worker.h"
 #include "server/workerpool.h"
 #include "str.h"
+#include "utils.h"
+#include "xappy/indexerworker.h"
 #include "xappy/searchworker.h"
-#include "json/json.h"
 
 // Maximum length of a message length.  9 = 10^9 bytes, and since we pull the
 // whole message into memory to deal with it, we almost certainly don't want to
 // allow this to be any larger.
-// FIXME - make this configurable.
 #define MAX_MSG_LEN_LEN 9
 
 void
@@ -86,6 +87,9 @@ XappyDispatcher::get_worker(const std::string & group, int current_workers)
     if (group == "search") {
     	return new SearchWorker();
     }
+    if (startswith(group, "indexer")) {
+    	return new IndexerWorker(group.substr(7));
+    }
     return NULL;
 }
 
@@ -115,6 +119,21 @@ XappyDispatcher::build_message(Message & msg,
     return true;
 }
 
+static void
+split_target(const std::string & target,
+	     std::vector<std::string> & components) {
+    std::string::size_type i = 0, j;
+    while (true) {
+	j = target.find('/', i);
+	if (j == target.npos) {
+	    components.push_back(target.substr(i));
+	    return;
+	}
+	components.push_back(target.substr(i, j - i));
+	i = j + 1;
+    }
+}
+
 /** Route a message appropriately.
  */
 void
@@ -130,6 +149,8 @@ XappyDispatcher::route_message(int connection_num,
 	return;
     }
     std::string target = msg.target.substr(1);
+    std::vector<std::string> components;
+    split_target(target, components);
     switch (msg.target[0]) {
 	case 'G': // GET
 	    {
@@ -137,9 +158,11 @@ XappyDispatcher::route_message(int connection_num,
 		    send_msg_response(connection_num, msg.msgid, 'S', VERSION);
 		    return;
 		}
-
-		send_to_worker("search", msg);
-		return;
+		if (components.size() >= 2 && components[0] == "db") {
+		    logger->info("Got request on db '" + components[1] + "'");
+		    send_to_worker("search", msg);
+		    return;
+		}
 	    }
 	    break;
 	case 'P': // POST
@@ -148,6 +171,11 @@ XappyDispatcher::route_message(int connection_num,
 	    break;
 	case 'U': // PUT
 	    {
+		if (components.size() >= 2 && components[0] == "db") {
+		    logger->info("Got request on db '" + components[1] + "'");
+		    send_to_worker("indexer_" + components[1], msg);
+		    return;
+		}
 	    }
 	    break;
 	case 'D': // DELETE
