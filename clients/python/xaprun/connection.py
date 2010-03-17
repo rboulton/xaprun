@@ -33,7 +33,7 @@ from config import xaprun_path
 from errors import ConnectionError
 
 class Connection(object):
-    """A connector
+    """Base class of connections to the xaprun server.
 
     All public methods in this class (ie, all whose names don't begin with _)
     are safe to call concurrently.
@@ -120,7 +120,7 @@ class Connection(object):
         This will return after the timeout is reached, or after a response is
         received.
 
-        It will call the callback associated with the response, if one if
+        It will call the callback associated with the response, if one is
         found.
 
         `timeout` is the time to wait for responses, in seconds.
@@ -210,6 +210,7 @@ class Connection(object):
         else:
             cb(response)
 
+    @locked
     def close(self):
         """Close the connection to the server.
 
