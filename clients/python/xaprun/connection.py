@@ -141,7 +141,12 @@ class Connection(object):
                 looped = True
 
             if need_more_data:
-                self.read_buf += self._read(1024, endtime)
+                new_data = self._read(1024, endtime)
+                if new_data is None:
+                    self._close()
+                    self._cleanup()
+                    raise ConnectionError("Connection closed unexpectedly")
+                self.read_buf += new_data
                 need_more_data = False
 
             if self.read_msg_len is None:
@@ -236,8 +241,8 @@ class Connection(object):
         """Read some bytes from the server.
 
         This must return as soon as any bytes are read, or the endtime is
-        reached.  It returns the bytes read (an empty string if no bytes were
-        read).
+        reached.  It returns the bytes read, or '' on a timeout.  If EOF is
+        returned, returns None.
 
         `endtime` is the time to return at, if no responses were returned.  If
         None, _read shouldn't return until a response is returned.
@@ -284,5 +289,8 @@ class LocalConnection(Connection):
                 timeout = 0
         ready_rfds = select.select([self.read_fd], [], [], timeout)[0]
         if ready_rfds == [self.read_fd]:
-            return os.read(self.read_fd, maxbytes)
+            res = os.read(self.read_fd, maxbytes)
+            if len(res) == 0:
+                return None
+            return res
         return ''
